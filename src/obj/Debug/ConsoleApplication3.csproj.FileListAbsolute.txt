@@ -1,0 +1,6 @@
+\\bianca\students\kn_b515s15datab\nogelainen_santeri\visual studio 2015\Projects\ConsoleApplication3\ConsoleApplication3\bin\Debug\ConsoleApplication3.exe.config
+\\bianca\students\kn_b515s15datab\nogelainen_santeri\visual studio 2015\Projects\ConsoleApplication3\ConsoleApplication3\obj\Debug\ConsoleApplication3.csprojResolveAssemblyReference.cache
+\\bianca\students\kn_b515s15datab\nogelainen_santeri\visual studio 2015\Projects\ConsoleApplication3\ConsoleApplication3\bin\Debug\ConsoleApplication3.exe
+\\bianca\students\kn_b515s15datab\nogelainen_santeri\visual studio 2015\Projects\ConsoleApplication3\ConsoleApplication3\bin\Debug\ConsoleApplication3.pdb
+\\bianca\students\kn_b515s15datab\nogelainen_santeri\visual studio 2015\Projects\ConsoleApplication3\ConsoleApplication3\obj\Debug\ConsoleApplication3.exe
+\\bianca\students\kn_b515s15datab\nogelainen_santeri\visual studio 2015\Projects\ConsoleApplication3\ConsoleApplication3\obj\Debug\ConsoleApplication3.pdb

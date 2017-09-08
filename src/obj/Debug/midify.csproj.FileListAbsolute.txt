@@ -1,0 +1,7 @@
+C:\Users\sante\Desktop\c-midi\ConsoleApplication3\bin\Debug\ConsoleApplication3.exe.config
+C:\Users\sante\Desktop\c-midi\ConsoleApplication3\bin\Debug\ConsoleApplication3.exe
+C:\Users\sante\Desktop\c-midi\ConsoleApplication3\bin\Debug\ConsoleApplication3.pdb
+C:\Users\sante\Desktop\c-midi\ConsoleApplication3\obj\Debug\midify.csprojResolveAssemblyReference.cache
+C:\Users\sante\Desktop\c-midi\ConsoleApplication3\obj\Debug\midify.csproj.CoreCompileInputs.cache
+C:\Users\sante\Desktop\c-midi\ConsoleApplication3\obj\Debug\ConsoleApplication3.exe
+C:\Users\sante\Desktop\c-midi\ConsoleApplication3\obj\Debug\ConsoleApplication3.pdb
