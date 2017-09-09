@@ -1,6 +1,7 @@
 ﻿#define DEBUG
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 
@@ -10,6 +11,7 @@ namespace Midis {
 
         private FileStream stream;
         public HeaderChunk header = new HeaderChunk();
+        public List<TrackChunk> tracks = new List<TrackChunk>();
 
         public Midi(string file) {
             this.ReadFile(file);
@@ -90,11 +92,108 @@ namespace Midis {
     /// header chunk "structure"
     /// </summary>
     public class HeaderChunk {
-        public byte[] prefix = new byte[4];
-        public byte[] length = new byte[4];
-        public byte[] format = new byte[2];
-        public byte[] tracks = new byte[2];
-        public byte[] timing = new byte[2];
+        public byte[] Prefix = new byte[4];
+        public byte[] Size = new byte[4];
+        public byte[] Format = new byte[2];
+        public byte[] Tracks = new byte[2];
+        public byte[] Timing = new byte[2];
+    }
+
+    /// <summary>
+    /// track chunk that always starts with MTrk
+    /// </summary>
+    public class TrackChunk {
+        public byte[] Prefix = new byte[4];
+        public byte[] Size = new byte[4];
+        public List<TrackEvent> events = new List<TrackEvent>();
+    }
+
+    public abstract class TrackEvent {
+
+        // event types, midi events have multiple types that only use 4bits
+        public enum EventType {
+            Meta = 0xff,
+            SysEx1 = 0xf0,
+            SysEx2 = 0xf7
+        };
+
+        // event timing
+        public byte[] Timing; //VLV
+        public byte Prefix;
+        
+    }
+
+    public abstract class MidiEvent : TrackEvent  {
+        
+        // event types for midi events
+        public enum MidiEventType {
+            MidiNoteOn = 0x9,
+            MidiNoteOff = 0x8,
+            MidiInstrument = 0xc,
+            MidiConstroller = 0xb,
+            MidiPitchBend = 0xe
+        }
+
+    }
+
+    /// <summary>
+    /// note on and note off are almost the same (only prefix is differrent)
+    /// note events in midi files
+    /// </summary>
+    public class NoteEvent : MidiEvent {
+
+        public static int Size = 2;
+        public byte Pitch;
+        public byte Velocity;
+
+    }
+
+    /// <summary>
+    /// intrument events, skipping with size
+    /// </summary>
+    public class InstrumentEvent : MidiEvent {
+
+        public static int Size = 1;
+
+    }
+
+    /// <summary>
+    /// midi controller events for controlling volume, stereo (panoramic), etc.
+    /// </summary>
+    public class ControllerEvent : MidiEvent {
+
+        // types that I might care about are listed here
+        public enum ControllerEventType {
+            Volume = 0x07,
+            Panoramic = 0x0a,
+            ControllersOff = 0x79,
+            NotesOff = 0x7b
+        };
+
+        public static int Size = 2;
+        public byte Controller;
+        public byte Value;
+
+    }
+
+    /// <summary>
+    /// useless, we only care about size so we can skip this
+    /// </summary>
+    public class PitchBendEvent : MidiEvent {
+
+        public static int Size = 2;
+
+    }
+
+
+    /// <summary>
+    /// meta events are ignored, we only need the size so we can skip it
+    /// </summary>
+    public class MetaEvent : TrackEvent {
+        
+        public byte Type;
+        public byte[] Size; //VLV
+        
     }
 
 }
