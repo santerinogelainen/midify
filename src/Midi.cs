@@ -4,38 +4,72 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using ByteConvert;
 
 namespace Midis {
 
     public class Midi {
 
-        private FileStream stream;
-        public HeaderChunk header = new HeaderChunk();
-        public List<TrackChunk> tracks = new List<TrackChunk>();
+        private FileStream Stream;
+        public HeaderChunk Header = new HeaderChunk();
+        public List<TrackChunk> Tracks = new List<TrackChunk>();
+        public bool IsLoaded = false;
 
         public Midi(string file) {
-            this.ReadFile(file);
+            if (this.ReadFile(file)) {
+                this.IsLoaded = true;
+            }
         }
 
         /// <summary>
         /// initalizes the FileStream variable, and sets all the headers / tracks of the file
         /// </summary>
         /// <param name="file"></param>
-        private void ReadFile(string file) {
-            this.stream = new FileStream(file, FileMode.Open);
-            this.ReadHeader();
+        /// <returns>true if successful</returns>
+        private bool ReadFile(string file) {
+
+            // check if file exists
+            if (!File.Exists(file)) {
+                Console.WriteLine("File '{0}' does not exists.", file);
+                return false;
+            }
+
+            // init filestream
+            this.Stream = new FileStream(file, FileMode.Open);
+
+            // read the header into the Header variable
+            if (!this.ReadHeader()) {
+                Console.WriteLine("Error reading the header.");
+                return false;
+            }
+
+            // read all the tracks into the this.Tracks list
+            if (!this.ReadAllTracks()) {
+                Console.WriteLine("Error reading tracks.");
+                return false;
+            }
+            return true;
         }
 
         /// <summary>
-        /// reads data into a class made of byte arrays (similar to how structs and fread works in c)
+        /// reads binary data into a class with byte variables or arrays (kinda similar to how structs and fread works in c)
         /// </summary>
         /// <param name="to">the object/class where to append</param>
         /// <param name="offset">offset where to start reading</param>
         private void ReadStream(object to, int offset = 0) {
+            // loop through each field in a class
             foreach (FieldInfo field in to.GetType().GetFields()) {
-                byte[] temp = new byte[((Array)field.GetValue(to)).Length];
-                this.stream.Read(temp, offset, ((Array)field.GetValue(to)).Length);
-                to.GetType().GetField(field.Name).SetValue(to, temp);
+                // if the field is a type of byte[] or byte
+                if (field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) {
+                    int numberOfBytes = ((Array)field.GetValue(to)).Length;
+                    byte[] temp = new byte[numberOfBytes];
+                    this.Stream.Read(temp, offset, numberOfBytes);
+                    if (field.FieldType == typeof(byte[])) {
+                        to.GetType().GetField(field.Name).SetValue(to, temp);
+                    } else {
+                        to.GetType().GetField(field.Name).SetValue(to, temp[0]);
+                    }
+                }
             }
         }
 
@@ -46,45 +80,80 @@ namespace Midis {
         private void DebugByteObject(object o) {
             Console.WriteLine("\n{0}", o.GetType().Name);
             foreach (FieldInfo field in o.GetType().GetFields()) {
-                Console.Write("\n{0, -15}", field.Name);
-                byte[] value = (byte[])field.GetValue(o);
-                Console.Write("{0, -20} ", this.ByteArrayToInt(value));
-                Console.Write("{0, -20} ", BitConverter.ToString(value));
-                foreach (byte b in value) {
-                    Console.Write("{0}", (char)b);
+                if (field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) {
+                    Console.Write("\n{0, -15}", field.Name);
+                    byte[] value = (byte[])field.GetValue(o);
+                    Console.Write("{0, -20} ", ByteConverter.ToInt(value));
+                    Console.Write("{0, -20} ", BitConverter.ToString(value));
+                    Console.Write("{0}", ByteConverter.ToASCIIString(value));
                 }
             }
             Console.WriteLine("\n");
         }
 
         /// <summary>
-        /// convert a byte array of unknown size into a Int64
-        /// </summary>
-        /// <param name="arr">byte array</param>
-        /// <returns>Int64 value of the byte(s)</returns>
-        private Int64 ByteArrayToInt(byte[] arr) {
-            switch (arr.Length) {
-                case sizeof(sbyte):
-                    return (Int64)arr[0];
-                case sizeof(Int16):
-                    return (Int64)BitConverter.ToInt16(arr, 0);
-                case sizeof(Int32):
-                    return (Int64)BitConverter.ToInt32(arr, 0);
-                case sizeof(Int64):
-                    return (Int64)BitConverter.ToInt64(arr, 0);
-            }
-            Console.WriteLine("Too big to convert into an integer.");
-            return -1;
-        }
-
-        /// <summary>
         /// read the header of the file to this.header
         /// </summary>
-        private void ReadHeader() {
-            this.ReadStream(this.header);
+        private bool ReadHeader() {
+            // read the first 14 bytes in the filestream to header
+            this.ReadStream(this.Header);
 #if (DEBUG)
-            this.DebugByteObject(this.header);
+            // show debug info
+            this.DebugByteObject(this.Header);
 #endif
+            // probably a midi file
+            if (ByteConverter.ToASCIIString(this.Header.Prefix) == "MThd" &&
+                ByteConverter.ToInt(this.Header.Size) == 6) {
+
+                // too many songs in one file
+                if (ByteConverter.ToInt(this.Header.Format) == 2) {
+                    Console.WriteLine("Midi files with multiple songs are not supported.");
+                    return false;
+                }
+                return true;
+            }
+            Console.WriteLine("The file given is not a midi file.");
+            return false;
+        }
+
+
+        private bool ReadAllTracks() {
+            // number of tracks in the file
+            Int64 numberOfTracks = ByteConverter.ToInt(this.Header.Tracks);
+
+            // loop each track
+            for (int i = 0; i < numberOfTracks; i++) {
+
+                // add new track
+                this.Tracks.Add(new TrackChunk());
+
+                // try reading the track info into the new track
+                if (!this.ReadTrack(this.Tracks[i])) {
+                    Console.WriteLine("Error reading track at index {0}.", i);
+                    return false;
+                }
+
+            }
+            return true;
+        }
+
+
+        private bool ReadTrack(TrackChunk track) {
+            this.ReadStream(track);
+
+#if (DEBUG)
+            // show track header info
+            this.DebugByteObject(track);
+#endif
+
+            if (ByteConverter.ToASCIIString(track.Prefix) != "MTrk") {
+                Console.WriteLine("Track does not start with MTrk prefix.");
+                return false;
+            }
+
+            // TODO: implement trackevent reader
+
+            return true;
         }
     }
 
