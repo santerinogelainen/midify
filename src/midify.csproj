@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ByteConverter.cs" />
+    <Compile Include="Wave.cs" />
     <Compile Include="Midi.cs" />
     <Compile Include="Midify.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
