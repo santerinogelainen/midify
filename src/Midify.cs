@@ -1,5 +1,6 @@
 ﻿using System;
 using Midis;
+using Waves;
 
 namespace ConsoleApplication3 {
     class midify {
@@ -38,6 +39,7 @@ namespace ConsoleApplication3 {
 
         static void Make(string filepath) {
             Midi m = new Midi(filepath);
+            Wave w = new Wave(WaveFile.Read, "wave.wav");
         }
 
         /// <summary>

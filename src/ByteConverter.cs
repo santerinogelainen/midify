@@ -8,8 +8,8 @@ namespace ByteConvert {
         /// </summary>
         /// <param name="arr">byte array</param>
         /// <returns>Int64 value of the byte(s)</returns>
-        public static Int64 ToInt(byte[] arr) {
-            if (BitConverter.IsLittleEndian) {
+        public static Int64 ToInt(byte[] arr, bool staylittleendian = false) {
+            if (BitConverter.IsLittleEndian && !staylittleendian) {
                 Array.Reverse(arr);
             }
             Int64 result = -1;
@@ -27,7 +27,7 @@ namespace ByteConvert {
                     result = BitConverter.ToInt64(arr, 0);
                     break;
             }
-            if (BitConverter.IsLittleEndian) {
+            if (BitConverter.IsLittleEndian && !staylittleendian) {
                 Array.Reverse(arr);
             }
             return result;

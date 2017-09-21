@@ -1,9 +1,11 @@
-﻿using System;
+﻿#define DEBUG
+
+using System;
 using System.Collections.Generic;
 using ByteConvert;
 using System.Reflection;
 using System.IO;
-using System.Runtime.InteropServices;
+using System.Linq;
 
 namespace Waves {
 
@@ -16,6 +18,8 @@ namespace Waves {
 
         // static variables
         public static Int64 MinSize = 44; // min bytesize
+        public static readonly HeaderChunk TargetHeader = new HeaderChunk();
+        public static readonly FormatChunk TargetFormat = new FormatChunk();
 
         private FileStream Stream;
         public HeaderChunk Header = new HeaderChunk();
@@ -129,9 +133,12 @@ namespace Waves {
                     } else {
                         value = new byte[] { (byte)field.GetValue(o) };
                     }
-                    Console.Write("{0, -20} ", ByteConverter.ToInt(value));
+                    Console.Write("{0, -20} ", ByteConverter.ToInt(value, true));
                     Console.Write("{0, -20} ", BitConverter.ToString(value));
                     Console.Write("{0}", ByteConverter.ToASCIIString(value));
+                } else if (field.FieldType == typeof(Int64) && field.GetValue(o) != null) {
+                    Console.Write("\n{0, -15}", field.Name);
+                    Console.Write("{0, -20} ", (Int64)field.GetValue(o));
                 }
             }
             Console.WriteLine("\n");
@@ -176,16 +183,18 @@ namespace Waves {
         private bool ReadHeader() {
             // read header from the filestream
             this.ReadStream(this.Header);
-            HeaderChunk compare = new HeaderChunk();
+#if DEBUG
+            this.DebugByteObject(this.Header);
+#endif
 
             // check that the file is a riff file
-            if (this.Header.Prefix != compare.Prefix) {
+            if (!this.Header.Prefix.SequenceEqual(Wave.TargetHeader.Prefix)) {
                 Console.WriteLine("Header does not start with 'RIFF'.");
                 return false;
             }
 
             // check that the file is a wave file
-            if (this.Header.Format != compare.Format) {
+            if (!this.Header.Format.SequenceEqual(Wave.TargetHeader.Format)) {
                 Console.WriteLine("RIFF file format is not type of 'WAVE'");
                 return false;
             }
@@ -199,60 +208,62 @@ namespace Waves {
         private bool ReadFormat() {
             // read format chunk
             this.ReadStream(this.Format);
-            FormatChunk compare = new FormatChunk();
+#if DEBUG
+            this.DebugByteObject(this.Format);
+#endif
 
             // check format chunk prefix
-            if (this.Format.Prefix != compare.Prefix) {
+            if (!this.Format.Prefix.SequenceEqual(Wave.TargetFormat.Prefix)) {
                 Console.WriteLine("Format chunk does not start with 'fmt '");
                 return false;
             }
 
             // maybe edit these to try and convert into a pcm wave file
             // check format chunk size
-            if (this.Format.Size != compare.Size) {
+            if (!this.Format.Size.SequenceEqual(Wave.TargetFormat.Size)) {
                 Console.WriteLine("Format chunk byte size is not 16. Wave file might not be PCM.");
                 return false;
             }
 
             // check format for PCM
-            if (this.Format.Format != compare.Format) {
+            if (!this.Format.Format.SequenceEqual(Wave.TargetFormat.Format)) {
                 Console.WriteLine("Wave file is not PCM.");
                 return false;
             }
 
             // check number of channels
-            if (this.Format.NumChannels != compare.NumChannels || this.Format.NumChannels != new byte[2] { 0x01, 0x00 }) {
+            if (ByteConverter.ToInt(this.Format.NumChannels, true) != 1 && ByteConverter.ToInt(this.Format.NumChannels, true) != 2) {
                 Console.WriteLine("Too many channels in wave file (max 2 / stereo).");
                 return false;
             }
 
             // check sample rate
             // todo: try to convert sample rate
-            if (this.Format.SampleRate != compare.SampleRate) {
+            if (!this.Format.SampleRate.SequenceEqual(Wave.TargetFormat.SampleRate)) {
                 Console.WriteLine("Sample rate is not 44100.");
                 return false;
             }
 
             // check byterate
             // to do: try to convert
-            if (this.Format.ByteRate != compare.ByteRate) {
+            /*if (!this.Format.ByteRate.SequenceEqual(Wave.TargetFormat.ByteRate)) {
                 Console.WriteLine("Byte rate is not 176400.");
                 return false;
-            }
+            }*/
 
             // check blockalign
             // to do: try to convert
-            if (this.Format.BlockAlign != compare.BlockAlign) {
+            /*if (!this.Format.BlockAlign.SequenceEqual(Wave.TargetFormat.BlockAlign)) {
                 Console.WriteLine("Sample byte size is not 4.");
                 return false;
-            }
+            }*/
 
             // check bits per channel
             // todo: try to convert
-            if (this.Format.BitsPerChannel != compare.BitsPerChannel) {
+            /*if (!this.Format.BitsPerChannel.SequenceEqual(Wave.TargetFormat.BitsPerChannel)) {
                 Console.WriteLine("Channel bit size is not 16.");
                 return false;
-            }
+            }*/
             return true;
         }
 
@@ -270,7 +281,7 @@ namespace Waves {
     }
 
     class FormatChunk {
-        public byte[] Prefix = new byte[4] { (byte)'f', (byte)'m', (byte)'t', (byte)'\0'};
+        public byte[] Prefix = new byte[4] { (byte)'f', (byte)'m', (byte)'t', (byte)' '};
         public byte[] Size = new byte[4] { 0x10, 0x00, 0x00, 0x00}; // 16 bytes
         public byte[] Format = new byte[2] { 0x01, 0x00 }; // 1 for PCM
         public byte[] NumChannels = new byte[2] { 0x02, 0x00 }; // 2 channels for stereo
