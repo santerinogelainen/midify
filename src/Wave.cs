@@ -1,4 +1,5 @@
 ﻿#define DEBUG
+//#define SAMPLEDEBUG
 
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,7 @@ namespace Waves {
         public static Int64 MinSize = 44; // min bytesize
         public static readonly HeaderChunk TargetHeader = new HeaderChunk();
         public static readonly FormatChunk TargetFormat = new FormatChunk();
+        public static readonly DataChunk TargetData = new DataChunk();
 
         private FileStream Stream;
         public HeaderChunk Header = new HeaderChunk();
@@ -44,7 +46,7 @@ namespace Waves {
         /// <param name="to">the object/class where to append</param>
         /// <param name="offset">offset where to start reading</param>
         /// <returns>integer of how many bytes did we read in the filestream</returns>
-        private int ReadStream(object to, int offset = 0, string[] skipFields = null) {
+        private int ReadStream(object to, int offset = 0, string[] skipFields = null, bool forcelittleendian = false) {
             skipFields = skipFields ?? new string[0];
             int travelDistance = 0;
             // loop through each field in a class
@@ -57,7 +59,7 @@ namespace Waves {
                     field.FieldType == typeof(Int64)) {
 
                     if (field.FieldType == typeof(Int64)) {
-                        travelDistance += this.ReadInt64(field, to, offset);
+                        travelDistance += this.ReadInt64(field, to, offset, forcelittleendian);
                     } else {
                         travelDistance += this.ReadBytes(field, to, offset);
                     }
@@ -101,7 +103,7 @@ namespace Waves {
         /// <param name="to">where to</param>
         /// <param name="offset">offset, not really used</param>
         /// <returns>number of bytes moved in the filestream (always 4)</returns>
-        private int ReadInt64(FieldInfo field, object to, int offset) {
+        private int ReadInt64(FieldInfo field, object to, int offset, bool forcelittleendian = false) {
             int numberOfBytes = 4;
 
             // read bytes
@@ -109,7 +111,7 @@ namespace Waves {
             this.Stream.Read(temp, offset, numberOfBytes);
 
             // convert bytes into an integer
-            Int64 result = ByteConverter.ToInt(temp);
+            Int64 result = ByteConverter.ToInt(temp, forcelittleendian);
 
             // set value of the field
             field.SetValue(to, result);
@@ -170,6 +172,18 @@ namespace Waves {
             // check file formatchunk
             if (!this.ReadFormat()) {
                 Console.WriteLine("Error reading wave file format.");
+                return false;
+            }
+
+            // read all samples
+            if (!this.ReadData()) {
+                Console.WriteLine("Error reading wave file samples.");
+                return false;
+            }
+
+            // transform clip
+            if (!this.TransformTo16()) {
+                Console.WriteLine("Error transforming wave file into a 16bit PCM.");
                 return false;
             }
 
@@ -244,28 +258,105 @@ namespace Waves {
                 return false;
             }
 
-            // check byterate
-            // to do: try to convert
-            /*if (!this.Format.ByteRate.SequenceEqual(Wave.TargetFormat.ByteRate)) {
-                Console.WriteLine("Byte rate is not 176400.");
-                return false;
-            }*/
-
-            // check blockalign
-            // to do: try to convert
-            /*if (!this.Format.BlockAlign.SequenceEqual(Wave.TargetFormat.BlockAlign)) {
-                Console.WriteLine("Sample byte size is not 4.");
-                return false;
-            }*/
-
-            // check bits per channel
-            // todo: try to convert
-            /*if (!this.Format.BitsPerChannel.SequenceEqual(Wave.TargetFormat.BitsPerChannel)) {
-                Console.WriteLine("Channel bit size is not 16.");
-                return false;
-            }*/
             return true;
         }
+
+        /// <summary>
+        /// Reads all data from a wave file datachunk into this.Data
+        /// </summary>
+        /// <returns></returns>
+        private bool ReadData() {
+            // read datachunk
+            this.ReadStream(this.Data, forcelittleendian: true);
+#if DEBUG
+            this.DebugByteObject(this.Data);
+#endif
+            // check datachunk prefix
+            if (!this.Data.Prefix.SequenceEqual(Wave.TargetData.Prefix)) {
+                Console.WriteLine("DataChunk does not start with 'data' prefix.");
+                return false;
+            }
+
+            Int64 bytespersample = ByteConverter.ToInt(this.Format.BlockAlign, true);
+            int bitsperchannel = (int)ByteConverter.ToInt(this.Format.BitsPerChannel, true);
+
+            Console.WriteLine("Reading samples...");
+            int nextprogress = 1;
+            // loop each sample
+            for (Int64 i = 0; i < this.Data.Size; i += bytespersample) {
+
+                // new sample, add it to the list of samples
+                Sample s = new Sample(bitsperchannel);
+                this.Data.Samples.Add(s);
+
+                // current index of the last element in our sample list
+                int sampleindex = this.Data.Samples.Count - 1;
+
+                // read data from the stream into the sample
+                this.ReadStream(this.Data.Samples[sampleindex], skipFields: new string[] { "Size" });
+
+                // calculate progress, and write it to the console
+                double progress = ((double)i / (double)this.Data.Size) * 100;
+                int progressint = (int)Math.Round(progress);
+                if (progressint > nextprogress) {
+                    Console.Write("#");
+                    nextprogress = progressint + 1;
+                }
+#if SAMPLEDEBUG
+                this.DebugByteObject(this.Data.Samples[sampleindex]);
+#endif
+            }
+            Console.WriteLine();
+            return true;
+        }
+
+        /// <summary>
+        /// Transforms the wave file into a PCM 16bit file
+        /// </summary>
+        /// <returns>true if successful</returns>
+        private bool TransformTo16() {
+
+            Int64 bitsperchannel = ByteConverter.ToInt(this.Format.BitsPerChannel, true);
+
+            // check if format is already correct
+            if (bitsperchannel == 16) {
+                Console.WriteLine("Wave clip already correct PCM format. Skipping transformation...");
+                return true;
+            }
+
+            // check if its possible to transform
+            if (bitsperchannel != 8 && bitsperchannel != 24 && bitsperchannel != 32) {
+                Console.WriteLine("Wave cannot be converted to 16bit audio.");
+                return false;
+            }
+
+            int datachunksize = 0;
+
+            // loop each sample
+            Console.WriteLine("Transforming samples to 16bit...");
+            foreach (Sample s in this.Data.Samples) {
+                // transform
+                s.ToSize16();
+
+                datachunksize += 4;
+            }
+
+            // change chunks datas
+            this.Data.Size = datachunksize;
+            this.Header.FileSize = Wave.MinSize + datachunksize;
+            this.Format.ByteRate = Wave.TargetFormat.ByteRate;
+            this.Format.BlockAlign = Wave.TargetFormat.BlockAlign;
+            this.Format.BitsPerChannel = Wave.TargetFormat.BitsPerChannel;
+
+#if DEBUG
+            this.DebugByteObject(this.Header);
+            this.DebugByteObject(this.Format);
+            this.DebugByteObject(this.Data);
+#endif
+
+            return true;
+        }
+
 
         private bool Write() {
             return true;
@@ -276,7 +367,7 @@ namespace Waves {
 
     class HeaderChunk {
         public byte[] Prefix = new byte[4] { (byte)'R', (byte)'I', (byte)'F', (byte)'F'};
-        public Int64 FileSize = 36; // changes, (36 + DataChunk.Size)
+        public Int64 FileSize = 44; // changes, (44 + DataChunk.Size)
         public byte[] Format = new byte[4] { (byte)'W', (byte)'A', (byte)'V', (byte)'E'};
     }
 
@@ -287,7 +378,7 @@ namespace Waves {
         public byte[] NumChannels = new byte[2] { 0x02, 0x00 }; // 2 channels for stereo
         public byte[] SampleRate = new byte[4] { 0x44, 0xac, 0x00, 0x00 }; // 44100, samples per second
         public byte[] ByteRate = new byte[4] { 0x10, 0xb1, 0x02, 0x00 }; // BlockAlign * SampleRate, bytes per second
-        public byte[] BlockAlign = new byte[2] { 0x04, 0x00 }; // NumChannels * BitsPerSample/8, bytes used by a single channel
+        public byte[] BlockAlign = new byte[2] { 0x04, 0x00 }; // NumChannels * BitsPerSample/8, bytes used by a single sample
         public byte[] BitsPerChannel = new byte[2] { 0x10, 0x00 }; // Bits per 1 channel (16, so 2 bytes per channel, and 4 bytes per sample)
     }
 
@@ -298,8 +389,45 @@ namespace Waves {
     }
 
     class Sample {
-        public byte[] Left = new byte[2];
-        public byte[] Right = new byte[2];
+        int Size;
+        public byte[] Left;
+        public byte[] Right;
+
+        public Sample(int bitsperchannel) {
+            int channelbytesize = bitsperchannel / 8;
+            Size = channelbytesize;
+            Left = new byte[channelbytesize];
+            Right = new byte[channelbytesize];
+        }
+
+        public bool ToSize16() {
+            // might have to do some bitwise operation tactics here, not quite sure how the channels work when they are played
+            // need to research
+            switch(Size) {
+                case 1:
+                    ChannelsTo16(0, 0);
+                    break;
+                case 3:
+                    ChannelsTo16(0, 1);
+                    break;
+                case 4:
+                    ChannelsTo16(0, 1);
+                    break;
+            }
+            Size = 2;
+            return true;
+        }
+
+        public void ChannelsTo16(int index1, int index2) {
+            Left = new byte[2] {
+                Left[index1],
+                Left[index2]
+            };
+            Right = new byte[2] {
+                Right[index1],
+                Right[index2]
+            };
+        }
     }
 
 }
