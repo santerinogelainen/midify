@@ -40,6 +40,7 @@ namespace ConsoleApplication3 {
         static void Make(string filepath) {
             Midi m = new Midi(filepath);
             Wave w = new Wave(WaveFile.Read, "wave.wav");
+            w.Save("test.wav");
         }
 
         /// <summary>

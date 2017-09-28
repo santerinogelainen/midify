@@ -40,6 +40,51 @@ namespace Waves {
             }
         }
 
+
+        /// <summary>
+        /// Writes bytes, byte arrays and int64s into a file as bytes
+        /// </summary>
+        /// <param name="to">file that we are writing to</param>
+        /// <param name="from">class where we are writing from</param>
+        /// <param name="offset">filestream write offset, not used really</param>
+        /// <param name="skipFields">skip any fields in param from object</param>
+        /// <returns>int of how many bytes we wrote</returns>
+        private int WriteStream(FileStream to, object from, int offset = 0, string[] skipFields = null) {
+            skipFields = skipFields ?? new string[0];
+            int traveldistance = 0;
+            // loop each field in class
+            foreach (FieldInfo field in from.GetType().GetFields()) {
+                // skip fields in skipFields array
+                if (Array.IndexOf(skipFields, field.Name) == -1 && (
+                    field.FieldType == typeof(byte[]) ||
+                    field.FieldType == typeof(byte)) ||
+                    field.FieldType == typeof(Int64)) {
+
+                    byte[] temp;
+
+                    if (field.FieldType == typeof(Int64)) {
+                        Int64 value = (Int64)field.GetValue(from);
+                        int value32 = (int)value;
+                        temp = BitConverter.GetBytes(value32);
+                        if (!BitConverter.IsLittleEndian) {
+                            temp.Reverse();
+                        }
+                    } else if (field.FieldType == typeof(byte[])) {
+                        temp = (byte[])field.GetValue(from);
+                    } else {
+                        temp = new byte[1] {
+                            (byte)field.GetValue(from)
+                        };
+                    }
+
+                    to.Write(temp, offset, temp.Length);
+                    traveldistance += temp.Length;
+                }
+            }
+            return traveldistance;
+        }
+
+
         /// <summary>
         /// reads binary data into a class with byte variables or arrays (kinda similar to how structs and fread works in c)
         /// </summary>
@@ -357,6 +402,41 @@ namespace Waves {
             return true;
         }
 
+        public bool Save(string filename) {
+
+            // check for file existance and ask if user wants to overwrite the old file
+            if (File.Exists(filename)) {
+                Console.WriteLine("Do you want to overwrite the existing file? ({0})", filename);
+                string input;
+                while (true) {
+                    Console.Write("y/n: ");
+                    input = Console.ReadLine();
+                    if (input == "y" || input == "n") {
+                        break;
+                    }
+                }
+                if (input == "n") {
+                    return false;
+                }
+            }
+            // create new file
+            FileStream newfile = new FileStream(filename, FileMode.Create);
+
+            // write header, format, and data chunks into the new file
+            this.WriteStream(newfile, this.Header);
+            this.WriteStream(newfile, this.Format);
+            this.WriteStream(newfile, this.Data);
+
+            // write all the samples into the file
+            foreach(Sample s in this.Data.Samples) {
+                this.WriteStream(newfile, s);
+            }
+
+            // close the new file
+            newfile.Close();
+            return true;
+        }
+    
 
         private bool Write() {
             return true;
@@ -400,33 +480,41 @@ namespace Waves {
             Right = new byte[channelbytesize];
         }
 
+        /// <summary>
+        /// Transforms sample into a 16bit pcm
+        /// </summary>
+        /// <returns>true if successful</returns>
         public bool ToSize16() {
-            // might have to do some bitwise operation tactics here, not quite sure how the channels work when they are played
-            // need to research
-            switch(Size) {
-                case 1:
-                    ChannelsTo16(0, 0);
-                    break;
-                case 3:
-                    ChannelsTo16(0, 1);
-                    break;
-                case 4:
-                    ChannelsTo16(0, 1);
-                    break;
-            }
+            ChannelsTo16(Size * 8);
             Size = 2;
             return true;
         }
 
-        public void ChannelsTo16(int index1, int index2) {
-            Left = new byte[2] {
-                Left[index1],
-                Left[index2]
-            };
-            Right = new byte[2] {
-                Right[index1],
-                Right[index2]
-            };
+        /// <summary>
+        /// Transforms both channels into a 16bit pcm
+        /// </summary>
+        /// <param name="origbitsize">Original bitsize (8, 24 or 32)</param>
+        private void ChannelsTo16(int origbitsize) {
+            Int64 l = ByteConverter.ToInt(this.Left, true);
+            Int64 r = ByteConverter.ToInt(this.Right, true);
+            switch (origbitsize) {
+                case 8:
+                    l *= byte.MaxValue;
+                    r *= byte.MaxValue;
+                    break;
+                case 24:
+                    l /= byte.MaxValue;
+                    r /= byte.MaxValue;
+                    break;
+                case 32:
+                    l /= UInt16.MaxValue;
+                    r /= UInt16.MaxValue;
+                    break;
+            }
+            Int16 l32 = (Int16)l;
+            Int16 r32 = (Int16)r;
+            Left = BitConverter.GetBytes(l32);
+            Right = BitConverter.GetBytes(r32);
         }
     }
 

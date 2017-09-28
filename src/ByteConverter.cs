@@ -9,6 +9,16 @@ namespace ByteConvert {
         /// <param name="arr">byte array</param>
         /// <returns>Int64 value of the byte(s)</returns>
         public static Int64 ToInt(byte[] arr, bool staylittleendian = false) {
+
+            if (arr.Length == 3) {
+                arr = new byte[4] {
+                    arr[0],
+                    arr[1],
+                    arr[2],
+                    0x00
+                };
+            }
+
             if (BitConverter.IsLittleEndian && !staylittleendian) {
                 Array.Reverse(arr);
             }
