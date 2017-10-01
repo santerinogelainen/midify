@@ -39,7 +39,7 @@ namespace AudioFileStream {
             foreach (FieldInfo field in to.GetType().GetFields()) {
 
                 // skip fields in skipFields array
-                if (Array.IndexOf(skipFields, field.Name) == -1) {
+                if (Array.IndexOf(skipFields, field.Name) == -1 && !field.IsStatic) {
 
                     // field is vlv
                     if (vlv != "" && field.Name == vlv) {
@@ -137,10 +137,10 @@ namespace AudioFileStream {
         }
 
         /// <summary>
-        /// pretty print a class that only has variables made of byte arrays (byte[])
+        /// pretty print a class that only has variables made of byte arrays (byte[]) and ints
         /// </summary>
         /// <param name="o">object to print</param>
-        public void DebugByteObject(object o) {
+        public static void DebugByteObject(object o) {
             Console.WriteLine("\n{0}", o.GetType().Name);
             foreach (FieldInfo field in o.GetType().GetFields()) {
                 if ((field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) && field.GetValue(o) != null) {

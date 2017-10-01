@@ -92,7 +92,7 @@ namespace Waves {
             // read header from the filestream
             this.Stream.Read(this.Header);
 #if DEBUG
-            this.Stream.DebugByteObject(this.Header);
+            AudioStream.DebugByteObject(this.Header);
 #endif
 
             // check that the file is a riff file
@@ -117,7 +117,7 @@ namespace Waves {
             // read format chunk
             this.Stream.Read(this.Format);
 #if DEBUG
-            this.Stream.DebugByteObject(this.Format);
+            AudioStream.DebugByteObject(this.Format);
 #endif
 
             // check format chunk prefix
@@ -163,7 +163,7 @@ namespace Waves {
             // read datachunk
             this.Stream.Read(this.Data, littleendian: true);
 #if DEBUG
-            this.Stream.DebugByteObject(this.Data);
+            AudioStream.DebugByteObject(this.Data);
 #endif
             // check datachunk prefix
             if (!this.Data.Prefix.SequenceEqual(Wave.TargetData.Prefix)) {
@@ -197,7 +197,7 @@ namespace Waves {
                     nextprogress = progressint + 1;
                 }
 #if SAMPLEDEBUG
-                this.Stream.DebugByteObject(this.Data.Samples[sampleindex]);
+                AudioStream.DebugByteObject(this.Data.Samples[sampleindex]);
 #endif
             }
             Console.WriteLine();
@@ -243,9 +243,9 @@ namespace Waves {
             this.Format.BitsPerChannel = Wave.TargetFormat.BitsPerChannel;
 
 #if DEBUG
-            this.Stream.DebugByteObject(this.Header);
-            this.Stream.DebugByteObject(this.Format);
-            this.Stream.DebugByteObject(this.Data);
+            AudioStream.DebugByteObject(this.Header);
+            AudioStream.DebugByteObject(this.Format);
+            AudioStream.DebugByteObject(this.Data);
 #endif
 
             return true;

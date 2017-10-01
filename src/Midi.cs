@@ -1,5 +1,6 @@
 ﻿#define DEBUG
 //#define METADEBUG
+//#define NOTEDEBUG
 
 using ByteConvert;
 using System;
@@ -64,7 +65,7 @@ namespace Midis {
             this.Stream.Read(this.Header);
 #if (DEBUG)
             // show debug info
-            this.Stream.DebugByteObject(this.Header);
+            AudioStream.DebugByteObject(this.Header);
 #endif
             // probably a midi file
             if (ByteConverter.ToASCIIString(this.Header.Prefix) == "MThd" &&
@@ -115,7 +116,7 @@ namespace Midis {
 
 #if (DEBUG)
             // show track header info
-            this.Stream.DebugByteObject(track);
+            AudioStream.DebugByteObject(track);
 #endif
 
             if (ByteConverter.ToASCIIString(track.Prefix) != "MTrk") {
@@ -137,7 +138,7 @@ namespace Midis {
             while (true) {
                 int jumpResult = ReadEvent(track.Events);
                 if (jumpResult == -1) {
-                    Console.WriteLine("Error reading event at index {0} of {1} bytes", i, trackByteSize);
+                    Console.WriteLine("Error reading event at index {0} of {1} bytes in the track (byte {2} in whole file).", i, trackByteSize, this.Stream.Stream.Position);
                     return false;
                 }
                 i += jumpResult;
@@ -158,7 +159,7 @@ namespace Midis {
             to.Add(new TrackEvent());
             int index = to.Count - 1;
             int eventSize = this.Stream.Read(to[index], vlv: "Timing");
-            
+
             // meta and sysex events
             switch(to[index].Prefix) {
                 case (byte)TrackEvent.EventType.SysEx1:
@@ -205,6 +206,10 @@ namespace Midis {
             n.Prefix = to[index].Prefix;
 
             int eventSize = this.Stream.Read(n, skipFields: new string[] { "Timing", "Prefix" });
+
+#if NOTEDEBUG
+            AudioStream.DebugByteObject(n);
+#endif
 
             to[index] = n;
 
@@ -295,7 +300,7 @@ namespace Midis {
                     t.Type = m.Type;
                     eventSize += this.Stream.Read(t, skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
 #if DEBUG
-                    this.Stream.DebugByteObject(t);
+                    AudioStream.DebugByteObject(t);
 #endif
                     to[index] = t;
                     return eventSize;
@@ -308,7 +313,7 @@ namespace Midis {
                     to[index] = ts;
                     eventSize += this.Stream.Read(to[index], skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
 #if DEBUG
-                    this.Stream.DebugByteObject(to[index]);
+                    AudioStream.DebugByteObject(to[index]);
 #endif
                     return eventSize;
             }
@@ -321,7 +326,7 @@ namespace Midis {
             to.RemoveAt(index);
 
 #if (METADEBUG)
-            this.Stream.DebugByteObject(m);
+            AudioStream.DebugByteObject(m);
             Console.WriteLine("Bytes skipped: {0}", skip);
 #endif
 
