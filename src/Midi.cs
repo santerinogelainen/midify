@@ -5,13 +5,13 @@ using ByteConvert;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
+using AudioFileStream;
 
 namespace Midis {
 
     public class Midi {
 
-        private FileStream Stream;
+        private AudioStream Stream;
         public HeaderChunk Header = new HeaderChunk();
         public List<TrackChunk> Tracks = new List<TrackChunk>();
         public bool IsLoaded = false;
@@ -40,7 +40,7 @@ namespace Midis {
             }
 
             // init filestream
-            this.Stream = new FileStream(file, FileMode.Open);
+            this.Stream = new AudioStream(file);
 
             // read the header into the Header variable
             if (!this.ReadHeader()) {
@@ -57,115 +57,14 @@ namespace Midis {
         }
 
         /// <summary>
-        /// reads binary data into a class with byte variables or arrays (kinda similar to how structs and fread works in c)
-        /// </summary>
-        /// <param name="to">the object/class where to append</param>
-        /// <param name="offset">offset where to start reading</param>
-        /// <returns>integer of how many bytes did we read in the filestream</returns>
-        private int ReadStream(object to, int offset = 0, string vlv = "", string[] skipFields = null) {
-            skipFields = skipFields ?? new string[0];
-            int travelDistance = 0;
-            // loop through each field in a class
-            foreach (FieldInfo field in to.GetType().GetFields()) {
-
-                // skip fields in skipFields array
-                if (Array.IndexOf(skipFields, field.Name) == -1) {
-                    // field is vlv
-                    if (vlv != "" && field.Name == vlv) {
-                        travelDistance += this.ReadVLV(field, to, offset);
-                    }
-
-                    // ELSE if the field is a type of byte[] or byte
-                     else if (field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) {
-                        travelDistance += this.ReadBytes(field, to, offset);
-                    }
-                }
-            }
-            return travelDistance;
-        }
-
-        /// <summary>
-        /// Read bytes from the filestream into a field in an object (unknown field length, aka variable length value VLV)
-        /// </summary>
-        /// <param name="field">what field</param>
-        /// <param name="to">where to append the filestream values</param>
-        /// <param name="offset">offset (not really used)</param>
-        private int ReadVLV(FieldInfo field, object to, int offset) {
-            List<byte[]> vlvBytes = new List<byte[]>(); // list of byte arrays (arrays because FileStream.Read requires arrays)
-            while (true) {
-                vlvBytes.Add(new byte[1]);
-                this.Stream.Read(vlvBytes[vlvBytes.Count-1], offset, 1);
-                if (vlvBytes[vlvBytes.Count-1][0] < 0x80) {
-                    break;
-                }
-            }
-            byte[] temp = new byte[vlvBytes.Count];
-            for (int i = 0; i < vlvBytes.Count; i++) {
-                temp[i] = vlvBytes[i][0];
-            }
-            field.SetValue(to, temp);
-            return vlvBytes.Count;
-        }
-
-        /// <summary>
-        /// Read bytes from the filestream into a field in an object (field with a known length)
-        /// </summary>
-        /// <param name="field">what field</param>
-        /// <param name="to">where to append the filestream values</param>
-        /// <param name="offset">offset (not really used)</param>
-        private int ReadBytes(FieldInfo field, object to, int offset) {
-            int numberOfBytes; // how many bytes can the field contain
-
-            if (field.FieldType == typeof(byte[])) {
-                numberOfBytes = ((Array)field.GetValue(to)).Length;
-            } else {
-                numberOfBytes = 1;
-            }
-
-            byte[] temp = new byte[numberOfBytes]; // create a temporary byte array with the field size
-            this.Stream.Read(temp, offset, numberOfBytes); // read bytes into the temporary array
-
-            // check if the orig field is a byte array or a single byte
-            if (field.FieldType == typeof(byte[])) { 
-                field.SetValue(to, temp);
-            } else {
-                field.SetValue(to, temp[0]);
-            }
-            return numberOfBytes;
-        }
-
-        /// <summary>
-        /// pretty print a class that only has variables made of byte arrays (byte[])
-        /// </summary>
-        /// <param name="o">object to print</param>
-        private void DebugByteObject(object o) {
-            Console.WriteLine("\n{0}", o.GetType().Name);
-            foreach (FieldInfo field in o.GetType().GetFields()) {
-                if ((field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) && field.GetValue(o) != null) {
-                    Console.Write("\n{0, -15}", field.Name);
-                    byte[] value;
-                    if (field.FieldType == typeof(byte[])) {
-                        value = (byte[])field.GetValue(o);
-                    } else {
-                        value = new byte[] { (byte)field.GetValue(o) };
-                    }
-                    Console.Write("{0, -20} ", ByteConverter.ToInt(value));
-                    Console.Write("{0, -20} ", BitConverter.ToString(value));
-                    Console.Write("{0}", ByteConverter.ToASCIIString(value));
-                }
-            }
-            Console.WriteLine("\n");
-        }
-
-        /// <summary>
         /// read the header of the file to this.header
         /// </summary>
         private bool ReadHeader() {
             // read the first 14 bytes in the filestream to header
-            this.ReadStream(this.Header);
+            this.Stream.Read(this.Header);
 #if (DEBUG)
             // show debug info
-            this.DebugByteObject(this.Header);
+            this.Stream.DebugByteObject(this.Header);
 #endif
             // probably a midi file
             if (ByteConverter.ToASCIIString(this.Header.Prefix) == "MThd" &&
@@ -188,7 +87,7 @@ namespace Midis {
         /// <returns>true if successful</returns>
         private bool ReadAllTracks() {
             // number of tracks in the file
-            Int64 numberOfTracks = ByteConverter.ToInt(this.Header.Tracks);
+            int numberOfTracks = ByteConverter.ToInt(this.Header.Tracks);
 
             // loop each track
             for (int i = 0; i < numberOfTracks; i++) {
@@ -212,11 +111,11 @@ namespace Midis {
         /// <param name="track">track</param>
         /// <returns>true if successful</returns>
         private bool ReadTrack(TrackChunk track) {
-            this.ReadStream(track);
+            this.Stream.Read(track);
 
 #if (DEBUG)
             // show track header info
-            this.DebugByteObject(track);
+            this.Stream.DebugByteObject(track);
 #endif
 
             if (ByteConverter.ToASCIIString(track.Prefix) != "MTrk") {
@@ -233,8 +132,8 @@ namespace Midis {
         /// <param name="track">track</param>
         /// <returns>true if successful</returns>
         private bool ReadAllEvents(TrackChunk track) {
-            Int64 trackByteSize = ByteConverter.ToInt(track.Size);
-            Int64 i = 0;
+            int trackByteSize = ByteConverter.ToInt(track.Size);
+            int i = 0;
             while (true) {
                 int jumpResult = ReadEvent(track.Events);
                 if (jumpResult == -1) {
@@ -258,7 +157,7 @@ namespace Midis {
         private int ReadEvent(List<TrackEvent> to) {
             to.Add(new TrackEvent());
             int index = to.Count - 1;
-            int eventSize = this.ReadStream(to[index], vlv: "Timing");
+            int eventSize = this.Stream.Read(to[index], vlv: "Timing");
             
             // meta and sysex events
             switch(to[index].Prefix) {
@@ -287,7 +186,7 @@ namespace Midis {
                     return eventSize;
             }
 
-            Console.WriteLine("Unknown event type 0x'{0}'", BitConverter.ToString(new byte[] { to[index].Prefix }));
+            Console.WriteLine("Unknown event type 0x{0}", BitConverter.ToString(new byte[] { to[index].Prefix }));
             return -1;
         }
 
@@ -305,7 +204,7 @@ namespace Midis {
             n.Timing = to[index].Timing;
             n.Prefix = to[index].Prefix;
 
-            int eventSize = this.ReadStream(n, skipFields: new string[] { "Timing", "Prefix" });
+            int eventSize = this.Stream.Read(n, skipFields: new string[] { "Timing", "Prefix" });
 
             to[index] = n;
 
@@ -326,7 +225,7 @@ namespace Midis {
             c.Timing = to[index].Timing;
             c.Prefix = to[index].Prefix;
 
-            int eventSize = this.ReadStream(c, skipFields: new string[] {"Timing", "Prefix"});
+            int eventSize = this.Stream.Read(c, skipFields: new string[] {"Timing", "Prefix"});
 
             to[index] = c;
 
@@ -341,7 +240,7 @@ namespace Midis {
         private int ReadInstrumentEvent(List<TrackEvent> to) {
 
             // skip instrument events in filestream
-            this.Stream.Seek(InstrumentEvent.Size, SeekOrigin.Current);
+            this.Stream.Skip(InstrumentEvent.Size);
 
             // remove event
             to.RemoveAt(to.Count-1);
@@ -357,7 +256,7 @@ namespace Midis {
         private int ReadPitchBendEvent(List<TrackEvent> to) {
 
             // skip instrument events in filestream
-            this.Stream.Seek(PitchBendEvent.Size, SeekOrigin.Current);
+            this.Stream.Skip(PitchBendEvent.Size);
 
             // remove event
             to.RemoveAt(to.Count - 1);
@@ -384,21 +283,49 @@ namespace Midis {
             MetaEvent m = new MetaEvent();
 
             // read new data into the meta event class, Size is a VLV and skip over Timing and Prefix
-            int eventSize = this.ReadStream(m, vlv: "Size", skipFields: new string[]{"Timing", "Prefix"});
+            int eventSize = this.Stream.Read(m, vlv: "Size", skipFields: new string[]{"Timing", "Prefix"});
+
+            // read tempo or time signature events
+            switch (m.Type) {
+                case (byte)MetaEvent.MetaEventType.Tempo:
+                    TempoEvent t = new TempoEvent();
+                    t.Timing = to[index].Timing;
+                    t.Prefix = to[index].Prefix;
+                    t.Size = m.Size;
+                    t.Type = m.Type;
+                    eventSize += this.Stream.Read(t, skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
+#if DEBUG
+                    this.Stream.DebugByteObject(t);
+#endif
+                    to[index] = t;
+                    return eventSize;
+                case (byte)MetaEvent.MetaEventType.TimeSignature:
+                    TimeSignatureEvent ts = new TimeSignatureEvent();
+                    ts.Timing = to[index].Timing;
+                    ts.Prefix = to[index].Prefix;
+                    ts.Size = m.Size;
+                    ts.Type = m.Type;
+                    to[index] = ts;
+                    eventSize += this.Stream.Read(to[index], skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
+#if DEBUG
+                    this.Stream.DebugByteObject(to[index]);
+#endif
+                    return eventSize;
+            }
 
             // skip the meta event data
-            Int64 skip = ByteConverter.ToInt(m.Size);
-            this.Stream.Seek(skip, SeekOrigin.Current);
+            int skip = ByteConverter.ToInt(m.Size);
+            this.Stream.Skip(skip);
 
             // remove the event since we do not need it
             to.RemoveAt(index);
 
 #if (METADEBUG)
-            this.DebugByteObject(m);
+            this.Stream.DebugByteObject(m);
             Console.WriteLine("Bytes skipped: {0}", skip);
 #endif
 
-            return eventSize + (int)skip;
+            return eventSize + skip;
         }
 
     }
@@ -516,13 +443,33 @@ namespace Midis {
 
 
     /// <summary>
-    /// meta events are ignored, we only need the size so we can skip it
+    /// meta events are ignored, unless they are tempo or time signature events
     /// </summary>
     public class MetaEvent : TrackEvent {
+
+        public enum MetaEventType {
+            Tempo = 0x51,
+            TimeSignature = 0x58
+        }
         
         public byte Type;
         public byte[] Size; //VLV
         
+    }
+
+    public class TempoEvent : MetaEvent {
+
+        public byte[] MSPerQN = new byte[3];
+
+    }
+
+    public class TimeSignatureEvent : MetaEvent {
+
+        public byte Numerator;
+        public byte Denominator;
+        public byte TicksPerClick;
+        public byte QN32;
+
     }
 
 }

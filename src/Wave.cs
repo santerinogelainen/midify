@@ -4,7 +4,7 @@
 using System;
 using System.Collections.Generic;
 using ByteConvert;
-using System.Reflection;
+using AudioFileStream;
 using System.IO;
 using System.Linq;
 
@@ -18,12 +18,12 @@ namespace Waves {
     class Wave {
 
         // static variables
-        public static Int64 MinSize = 44; // min bytesize
+        public static int MinSize = 44; // min bytesize
         public static readonly HeaderChunk TargetHeader = new HeaderChunk();
         public static readonly FormatChunk TargetFormat = new FormatChunk();
         public static readonly DataChunk TargetData = new DataChunk();
 
-        private FileStream Stream;
+        private AudioStream Stream;
         public HeaderChunk Header = new HeaderChunk();
         public FormatChunk Format = new FormatChunk();
         public DataChunk Data = new DataChunk();
@@ -40,157 +40,6 @@ namespace Waves {
             }
         }
 
-
-        /// <summary>
-        /// Writes bytes, byte arrays and int64s into a file as bytes
-        /// </summary>
-        /// <param name="to">file that we are writing to</param>
-        /// <param name="from">class where we are writing from</param>
-        /// <param name="offset">filestream write offset, not used really</param>
-        /// <param name="skipFields">skip any fields in param from object</param>
-        /// <returns>int of how many bytes we wrote</returns>
-        private int WriteStream(FileStream to, object from, int offset = 0, string[] skipFields = null) {
-            skipFields = skipFields ?? new string[0];
-            int traveldistance = 0;
-            // loop each field in class
-            foreach (FieldInfo field in from.GetType().GetFields()) {
-                // skip fields in skipFields array
-                if (Array.IndexOf(skipFields, field.Name) == -1 && (
-                    field.FieldType == typeof(byte[]) ||
-                    field.FieldType == typeof(byte)) ||
-                    field.FieldType == typeof(Int64)) {
-
-                    byte[] temp;
-
-                    if (field.FieldType == typeof(Int64)) {
-                        Int64 value = (Int64)field.GetValue(from);
-                        int value32 = (int)value;
-                        temp = BitConverter.GetBytes(value32);
-                        if (!BitConverter.IsLittleEndian) {
-                            temp.Reverse();
-                        }
-                    } else if (field.FieldType == typeof(byte[])) {
-                        temp = (byte[])field.GetValue(from);
-                    } else {
-                        temp = new byte[1] {
-                            (byte)field.GetValue(from)
-                        };
-                    }
-
-                    to.Write(temp, offset, temp.Length);
-                    traveldistance += temp.Length;
-                }
-            }
-            return traveldistance;
-        }
-
-
-        /// <summary>
-        /// reads binary data into a class with byte variables or arrays (kinda similar to how structs and fread works in c)
-        /// </summary>
-        /// <param name="to">the object/class where to append</param>
-        /// <param name="offset">offset where to start reading</param>
-        /// <returns>integer of how many bytes did we read in the filestream</returns>
-        private int ReadStream(object to, int offset = 0, string[] skipFields = null, bool forcelittleendian = false) {
-            skipFields = skipFields ?? new string[0];
-            int travelDistance = 0;
-            // loop through each field in a class
-            foreach (FieldInfo field in to.GetType().GetFields()) {
-
-                // skip fields in skipFields array
-                if (Array.IndexOf(skipFields, field.Name) == -1 && (
-                    field.FieldType == typeof(byte[]) || 
-                    field.FieldType == typeof(byte)) ||
-                    field.FieldType == typeof(Int64)) {
-
-                    if (field.FieldType == typeof(Int64)) {
-                        travelDistance += this.ReadInt64(field, to, offset, forcelittleendian);
-                    } else {
-                        travelDistance += this.ReadBytes(field, to, offset);
-                    }
-                }
-            }
-            return travelDistance;
-        }
-
-        /// <summary>
-        /// Read bytes from the filestream into a field in an object (field with a known length)
-        /// </summary>
-        /// <param name="field">what field</param>
-        /// <param name="to">where to append the filestream values</param>
-        /// <param name="offset">offset (not really used)</param>
-        private int ReadBytes(FieldInfo field, object to, int offset) {
-            int numberOfBytes; // how many bytes can the field contain
-
-            if (field.FieldType == typeof(byte[])) {
-                numberOfBytes = ((Array)field.GetValue(to)).Length;
-            } else {
-                numberOfBytes = 1;
-            }
-
-            byte[] temp = new byte[numberOfBytes]; // create a temporary byte array with the field size
-            this.Stream.Read(temp, offset, numberOfBytes); // read bytes into the temporary array
-
-            // check if the orig field is a byte array or a single byte
-            if (field.FieldType == typeof(byte[])) {
-                field.SetValue(to, temp);
-            } else {
-                field.SetValue(to, temp[0]);
-            }
-            return numberOfBytes;
-        }
-
-
-        /// <summary>
-        /// Read integers (64) from the filestream into a field in an object
-        /// </summary>
-        /// <param name="field">what field</param>
-        /// <param name="to">where to</param>
-        /// <param name="offset">offset, not really used</param>
-        /// <returns>number of bytes moved in the filestream (always 4)</returns>
-        private int ReadInt64(FieldInfo field, object to, int offset, bool forcelittleendian = false) {
-            int numberOfBytes = 4;
-
-            // read bytes
-            byte[] temp = new byte[numberOfBytes];
-            this.Stream.Read(temp, offset, numberOfBytes);
-
-            // convert bytes into an integer
-            Int64 result = ByteConverter.ToInt(temp, forcelittleendian);
-
-            // set value of the field
-            field.SetValue(to, result);
-
-            // return travel distance in filestream
-            return numberOfBytes;
-        }
-
-        /// <summary>
-        /// pretty print a class that only has variables made of byte arrays (byte[])
-        /// </summary>
-        /// <param name="o">object to print</param>
-        private void DebugByteObject(object o) {
-            Console.WriteLine("\n{0}", o.GetType().Name);
-            foreach (FieldInfo field in o.GetType().GetFields()) {
-                if ((field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) && field.GetValue(o) != null) {
-                    Console.Write("\n{0, -15}", field.Name);
-                    byte[] value;
-                    if (field.FieldType == typeof(byte[])) {
-                        value = (byte[])field.GetValue(o);
-                    } else {
-                        value = new byte[] { (byte)field.GetValue(o) };
-                    }
-                    Console.Write("{0, -20} ", ByteConverter.ToInt(value, true));
-                    Console.Write("{0, -20} ", BitConverter.ToString(value));
-                    Console.Write("{0}", ByteConverter.ToASCIIString(value));
-                } else if (field.FieldType == typeof(Int64) && field.GetValue(o) != null) {
-                    Console.Write("\n{0, -15}", field.Name);
-                    Console.Write("{0, -20} ", (Int64)field.GetValue(o));
-                }
-            }
-            Console.WriteLine("\n");
-        }
-
         private bool Read(string filepath) {
 
             // check file existance
@@ -200,7 +49,7 @@ namespace Waves {
             }
 
             // set filestream
-            this.Stream = new FileStream(filepath, FileMode.Open);
+            this.Stream = new AudioStream(filepath);
 
             // check file length
             if (this.Stream.Length <= Wave.MinSize) {
@@ -241,9 +90,9 @@ namespace Waves {
         /// <returns>true if header looks like a wave file</returns>
         private bool ReadHeader() {
             // read header from the filestream
-            this.ReadStream(this.Header);
+            this.Stream.Read(this.Header);
 #if DEBUG
-            this.DebugByteObject(this.Header);
+            this.Stream.DebugByteObject(this.Header);
 #endif
 
             // check that the file is a riff file
@@ -266,9 +115,9 @@ namespace Waves {
         /// <returns>true if format looks like a pcm wave file</returns>
         private bool ReadFormat() {
             // read format chunk
-            this.ReadStream(this.Format);
+            this.Stream.Read(this.Format);
 #if DEBUG
-            this.DebugByteObject(this.Format);
+            this.Stream.DebugByteObject(this.Format);
 #endif
 
             // check format chunk prefix
@@ -312,9 +161,9 @@ namespace Waves {
         /// <returns></returns>
         private bool ReadData() {
             // read datachunk
-            this.ReadStream(this.Data, forcelittleendian: true);
+            this.Stream.Read(this.Data, littleendian: true);
 #if DEBUG
-            this.DebugByteObject(this.Data);
+            this.Stream.DebugByteObject(this.Data);
 #endif
             // check datachunk prefix
             if (!this.Data.Prefix.SequenceEqual(Wave.TargetData.Prefix)) {
@@ -338,7 +187,7 @@ namespace Waves {
                 int sampleindex = this.Data.Samples.Count - 1;
 
                 // read data from the stream into the sample
-                this.ReadStream(this.Data.Samples[sampleindex], skipFields: new string[] { "Size" });
+                this.Stream.Read(this.Data.Samples[sampleindex], skipFields: new string[] { "Size" });
 
                 // calculate progress, and write it to the console
                 double progress = ((double)i / (double)this.Data.Size) * 100;
@@ -348,7 +197,7 @@ namespace Waves {
                     nextprogress = progressint + 1;
                 }
 #if SAMPLEDEBUG
-                this.DebugByteObject(this.Data.Samples[sampleindex]);
+                this.Stream.DebugByteObject(this.Data.Samples[sampleindex]);
 #endif
             }
             Console.WriteLine();
@@ -394,9 +243,9 @@ namespace Waves {
             this.Format.BitsPerChannel = Wave.TargetFormat.BitsPerChannel;
 
 #if DEBUG
-            this.DebugByteObject(this.Header);
-            this.DebugByteObject(this.Format);
-            this.DebugByteObject(this.Data);
+            this.Stream.DebugByteObject(this.Header);
+            this.Stream.DebugByteObject(this.Format);
+            this.Stream.DebugByteObject(this.Data);
 #endif
 
             return true;
@@ -423,13 +272,13 @@ namespace Waves {
             FileStream newfile = new FileStream(filename, FileMode.Create);
 
             // write header, format, and data chunks into the new file
-            this.WriteStream(newfile, this.Header);
-            this.WriteStream(newfile, this.Format);
-            this.WriteStream(newfile, this.Data);
+            AudioStream.Write(newfile, this.Header);
+            AudioStream.Write(newfile, this.Format);
+            AudioStream.Write(newfile, this.Data);
 
             // write all the samples into the file
             foreach(Sample s in this.Data.Samples) {
-                this.WriteStream(newfile, s);
+                AudioStream.Write(newfile, s);
             }
 
             // close the new file
@@ -447,7 +296,7 @@ namespace Waves {
 
     class HeaderChunk {
         public byte[] Prefix = new byte[4] { (byte)'R', (byte)'I', (byte)'F', (byte)'F'};
-        public Int64 FileSize = 44; // changes, (44 + DataChunk.Size)
+        public int FileSize = 44; // changes, (44 + DataChunk.Size)
         public byte[] Format = new byte[4] { (byte)'W', (byte)'A', (byte)'V', (byte)'E'};
     }
 
@@ -464,7 +313,7 @@ namespace Waves {
 
     class DataChunk {
         public byte[] Prefix = new byte[4] { (byte)'d', (byte)'a', (byte)'t', (byte)'a'};
-        public Int64 Size; // changes
+        public int Size; // changes
         public List<Sample> Samples = new List<Sample>(); // changes
     }
 
@@ -495,8 +344,8 @@ namespace Waves {
         /// </summary>
         /// <param name="origbitsize">Original bitsize (8, 24 or 32)</param>
         private void ChannelsTo16(int origbitsize) {
-            Int64 l = ByteConverter.ToInt(this.Left, true);
-            Int64 r = ByteConverter.ToInt(this.Right, true);
+            int l = ByteConverter.ToInt(this.Left, true);
+            int r = ByteConverter.ToInt(this.Right, true);
             switch (origbitsize) {
                 case 8:
                     l *= byte.MaxValue;
@@ -511,10 +360,10 @@ namespace Waves {
                     r /= UInt16.MaxValue;
                     break;
             }
-            Int16 l32 = (Int16)l;
-            Int16 r32 = (Int16)r;
-            Left = BitConverter.GetBytes(l32);
-            Right = BitConverter.GetBytes(r32);
+            Int16 l16 = (Int16)l;
+            Int16 r16 = (Int16)r;
+            Left = BitConverter.GetBytes(l16);
+            Right = BitConverter.GetBytes(r16);
         }
     }
 
