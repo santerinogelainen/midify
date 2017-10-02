@@ -1,5 +1,6 @@
 ﻿using ByteConvert;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -70,21 +71,51 @@ namespace AudioFileStream {
         /// </summary>
         /// <param name="field">what field</param>
         /// <param name="to">where to append the filestream values</param>
+        /// <returns>how many bytes read from filestream</returns>
         private int ReadVLV(FieldInfo field, object to) {
-            List<byte[]> vlvBytes = new List<byte[]>(); // list of byte arrays (arrays because FileStream.Read requires arrays)
+            // each byte as a bitarray
+            List<BitArray> vlvBits = new List<BitArray>();
+            // read all vlv values
             while (true) {
-                vlvBytes.Add(new byte[1]);
-                this.Stream.Read(vlvBytes[vlvBytes.Count - 1], 0, 1);
-                if (vlvBytes[vlvBytes.Count - 1][0] < 0x80) {
+                byte[] b = new byte[1];
+                this.Stream.Read(b, 0, 1);
+                vlvBits.Add(new BitArray(b));
+                if (b[0] < 0x80) {
                     break;
                 }
             }
-            byte[] temp = new byte[vlvBytes.Count];
-            for (int i = 0; i < vlvBytes.Count; i++) {
-                temp[i] = vlvBytes[i][0];
+
+            vlvBits.Reverse();
+
+            // transform vlvs to readable bytes
+            // see http://www.ccarh.org/courses/253/handout/vlv/
+            // each byte has 7 data bits and 1 continuation bit
+            // total bits
+            int dataBitCount = vlvBits.Count * 7;
+            int contBitCount = vlvBits.Count; // * 1, but that can be left out since multiplying with 1 is useless
+            int totalBits = dataBitCount + contBitCount;
+            BitArray finalBits = new BitArray(totalBits);
+            int cur = 0;
+            foreach (BitArray bits in vlvBits) {
+                // start at 1, since we skip the first bit (continuation bit of the bitarray)
+                for (int i = 0; i < 7; i++) {
+                    int index = (cur * 7) + i;
+                    finalBits.Set(index, bits.Get(i));
+                }
+                cur++;
             }
+
+            // set cont bit "margin"
+            for (int i = dataBitCount; i < totalBits; i++) {
+                finalBits.Set(i, false);
+            }
+
+            // transform final bitarray to byte[]
+            byte[] temp = new byte[(totalBits / 8)];
+            finalBits.CopyTo(temp, 0);
+            temp = temp.Reverse().ToArray();
             field.SetValue(to, temp);
-            return vlvBytes.Count;
+            return vlvBits.Count;
         }
 
         /// <summary>
