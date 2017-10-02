@@ -84,6 +84,10 @@ namespace Waves {
             // trim clip
             this.Data.Trim();
 
+#if DEBUG
+            AudioStream.DebugByteObject(this.Data, true);
+#endif
+
             return true;
         }
 
@@ -325,6 +329,7 @@ namespace Waves {
 
         /// <summary>
         /// Removes unnecessary 0 bits from the start and the end is a wave file
+        /// NOTE! use only after transforming to 16bit PCM!!!!
         /// </summary>
         public void Trim() {
 
@@ -336,7 +341,7 @@ namespace Waves {
             while (true) {
                 if (this.Samples[0].Left.SequenceEqual(new byte[2] { 0x00, 0x00 }) && this.Samples[0].Right.SequenceEqual(new byte[2] { 0x00, 0x00 })) {
                     this.Samples.RemoveAt(0);
-                    Size -= 1;
+                    Size -= 4;
                 } else {
                     break;
                 }
@@ -347,7 +352,7 @@ namespace Waves {
                 Sample last = this.Samples[this.Samples.Count - 1];
                 if (last.Left.SequenceEqual(new byte[2] { 0x00, 0x00 }) && last.Right.SequenceEqual(new byte[2] { 0x00, 0x00 })) {
                     this.Samples.RemoveAt(this.Samples.Count - 1);
-                    Size -= 1;
+                    Size -= 4;
                 } else {
                     break;
                 }
