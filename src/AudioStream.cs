@@ -8,7 +8,7 @@ using System.Reflection;
 
 namespace AudioFileStream {
 
-    class AudioStream {
+    public class AudioStream {
 
         public FileStream Stream;
         public Int64 Length;
@@ -233,6 +233,32 @@ namespace AudioFileStream {
                 }
             }
             return traveldistance;
+        }
+
+        /// <summary>
+        /// Copies non-static byte arrays, bytes and integers from one object to another
+        /// </summary>
+        /// <param name="from">object where to copy from</param>
+        /// <param name="to">object where to copy</param>
+        /// <param name="skipFields">skip any fields?</param>
+        /// <returns>number of fields copied</returns>
+        public static int Copy(object from, object to, string[] skipFields = null) {
+            skipFields = skipFields ?? new string[0];
+            int copied = 0;
+            foreach (FieldInfo field in from.GetType().GetFields()) {
+                if (Array.IndexOf(skipFields, field.Name) == -1 && 
+                    (field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte) || field.FieldType == typeof(int)) &&
+                    !field.IsStatic &&
+                    field.GetValue(from) != null) {
+
+                    FieldInfo tofield = to.GetType().GetField(field.Name);
+                    if (tofield != null) {
+                        tofield.SetValue(to, field.GetValue(from));
+                        copied++;
+                    }
+                }
+            }
+            return copied;
         }
 
         /// <summary>

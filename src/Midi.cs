@@ -1,6 +1,8 @@
 ﻿#define DEBUG
 //#define METADEBUG
 //#define NOTEDEBUG
+#define TEMPODEBUG
+#define TIMESIGDEBUG
 
 using ByteConvert;
 using System;
@@ -15,6 +17,9 @@ namespace Midis {
         private AudioStream Stream;
         public HeaderChunk Header = new HeaderChunk();
         public List<TrackChunk> Tracks = new List<TrackChunk>();
+        public List<TempoEvent> TempoChanges = new List<TempoEvent>();
+        public List<TimeSignatureEvent> TimeSignatureChanges = new List<TimeSignatureEvent>();
+
         public bool IsLoaded = false;
 
         /// <summary>
@@ -136,7 +141,7 @@ namespace Midis {
             int trackByteSize = ByteConverter.ToInt(track.Size);
             int i = 0;
             while (true) {
-                int jumpResult = ReadEvent(track.Events);
+                int jumpResult = TrackEvent.Read(this.Stream, track.Events, this.TempoChanges, this.TimeSignatureChanges);
                 if (jumpResult == -1) {
                     Console.WriteLine("Error reading event at index {0} of {1} bytes in the track (byte {2} in whole file).", i, trackByteSize, this.Stream.Stream.Position);
                     return false;
@@ -150,202 +155,11 @@ namespace Midis {
             return true;
         }
 
-        /// <summary>
-        /// Determines the type of a track event and adds that to a list
-        /// </summary>
-        /// <param name="to">list where to append</param>
-        /// <returns>how many bytes added or -1 if errors happened</returns>
-        private int ReadEvent(List<TrackEvent> to) {
-            to.Add(new TrackEvent());
-            int index = to.Count - 1;
-            int eventSize = this.Stream.Read(to[index], vlv: "Timing");
-
-            // meta and sysex events
-            switch(to[index].Prefix) {
-                case (byte)TrackEvent.EventType.SysEx1:
-                case (byte)TrackEvent.EventType.SysEx2:
-                    return this.ReadSysExEvent();
-                case (byte)TrackEvent.EventType.Meta:
-                    eventSize += this.ReadMetaEvent(to);
-                    return eventSize;
-            }
-
-            // midi events are detected with high bits (first four)
-            switch (to[index].Prefix >> 4) {
-                case (byte)MidiEvent.MidiEventType.Instrument:
-                    eventSize += this.ReadInstrumentEvent(to);
-                    return eventSize;
-                case (byte)MidiEvent.MidiEventType.Controller:
-                    eventSize += this.ReadControllerEvent(to);
-                    return eventSize;
-                case (byte)MidiEvent.MidiEventType.PitchBend:
-                    eventSize += this.ReadPitchBendEvent(to);
-                    return eventSize;
-                case (byte)MidiEvent.MidiEventType.NoteOn:
-                case (byte)MidiEvent.MidiEventType.NoteOff:
-                    eventSize += this.ReadNoteEvent(to);
-                    return eventSize;
-            }
-
-            Console.WriteLine("Unknown event type 0x{0}", BitConverter.ToString(new byte[] { to[index].Prefix }));
-            return -1;
-        }
-
-
-        /// <summary>
-        /// Reads a note event from the file into the TrackEvent List
-        /// </summary>
-        /// <param name="to">List where to append</param>
-        /// <returns>amount of bytes read from filestream</returns>
-        private int ReadNoteEvent(List<TrackEvent> to) {
-
-            int index = to.Count - 1;
-
-            NoteEvent n = new NoteEvent();
-            n.Timing = to[index].Timing;
-            n.Prefix = to[index].Prefix;
-
-            int eventSize = this.Stream.Read(n, skipFields: new string[] { "Timing", "Prefix" });
-
-#if NOTEDEBUG
-            AudioStream.DebugByteObject(n);
-#endif
-
-            to[index] = n;
-
-            return eventSize;
-
-        }
-
-        /// <summary>
-        /// Reads a controller event from the file into the TrackEvent List
-        /// </summary>
-        /// <param name="to">List where to append</param>
-        /// <returns>amount of bytes read from filestream</returns>
-        private int ReadControllerEvent(List<TrackEvent> to) {
-
-            int index = to.Count - 1;
-
-            ControllerEvent c = new ControllerEvent();
-            c.Timing = to[index].Timing;
-            c.Prefix = to[index].Prefix;
-
-            int eventSize = this.Stream.Read(c, skipFields: new string[] {"Timing", "Prefix"});
-
-            to[index] = c;
-
-            return eventSize;
-        }
-
-        /// <summary>
-        /// skips instrument event data from the filestream, and removes the trackevent from the list
-        /// </summary>
-        /// <param name="to">list where to remove</param>
-        /// <returns>amount of bytes skipped</returns>
-        private int ReadInstrumentEvent(List<TrackEvent> to) {
-
-            // skip instrument events in filestream
-            this.Stream.Skip(InstrumentEvent.Size);
-
-            // remove event
-            to.RemoveAt(to.Count-1);
-
-            return InstrumentEvent.Size;
-        }
-
-        /// <summary>
-        /// skips pitch bend event data from the filestream, and removes the trackevent from the list
-        /// </summary>
-        /// <param name="to">list where to remove</param>
-        /// <returns>amount of bytes skipped</returns>
-        private int ReadPitchBendEvent(List<TrackEvent> to) {
-
-            // skip instrument events in filestream
-            this.Stream.Skip(PitchBendEvent.Size);
-
-            // remove event
-            to.RemoveAt(to.Count - 1);
-
-            return PitchBendEvent.Size;
-        }
-
-
-        /// <summary>
-        /// gives an error because sysex events are not supported
-        /// </summary>
-        /// <returns>error code -1</returns>
-        private int ReadSysExEvent() {
-            Console.WriteLine("System exclusive events are not supported.");
-            return -1;
-        }
-
-
-        private int ReadMetaEvent(List<TrackEvent> to) {
-            // index is always last one in list
-            int index = to.Count - 1;
-
-            // new meta event with the prefix and timing
-            MetaEvent m = new MetaEvent();
-
-            // read new data into the meta event class, Size is a VLV and skip over Timing and Prefix
-            int eventSize = this.Stream.Read(m, vlv: "Size", skipFields: new string[]{"Timing", "Prefix"});
-
-            // read tempo or time signature events
-            switch (m.Type) {
-                case (byte)MetaEvent.MetaEventType.Tempo:
-                    TempoEvent t = new TempoEvent();
-                    t.Timing = to[index].Timing;
-                    t.Prefix = to[index].Prefix;
-                    t.Size = m.Size;
-                    t.Type = m.Type;
-                    eventSize += this.Stream.Read(t, skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
-#if DEBUG
-                    AudioStream.DebugByteObject(t);
-#endif
-                    to[index] = t;
-                    return eventSize;
-                case (byte)MetaEvent.MetaEventType.TimeSignature:
-                    TimeSignatureEvent ts = new TimeSignatureEvent();
-                    ts.Timing = to[index].Timing;
-                    ts.Prefix = to[index].Prefix;
-                    ts.Size = m.Size;
-                    ts.Type = m.Type;
-                    to[index] = ts;
-                    eventSize += this.Stream.Read(to[index], skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
-#if DEBUG
-                    AudioStream.DebugByteObject(to[index]);
-#endif
-                    return eventSize;
-            }
-
-            // skip the meta event data
-            int skip = ByteConverter.ToInt(m.Size);
-            this.Stream.Skip(skip);
-
-            // remove the event since we do not need it
-            to.RemoveAt(index);
-
-#if (METADEBUG)
-            AudioStream.DebugByteObject(m);
-            Console.WriteLine("Bytes skipped: {0}", skip);
-#endif
-
-            return eventSize + skip;
-        }
-
     }
 
 
 
-
-
-
-
-
-
-
-
-
+    
 
 
 
@@ -381,6 +195,39 @@ namespace Midis {
         // event timing
         public byte[] Timing;//VLV
         public byte Prefix;
+
+        /// <summary>
+        /// reads and determines the type of a track event, and adds that to the proper list
+        /// </summary>
+        /// <param name="from">stream where to read from</param>
+        /// <param name="allevents">list of all events (notes and controllers)</param>
+        /// <param name="tempoevents">list of tempo events</param>
+        /// <param name="tsigevents">list of time signature events</param>
+        /// <returns>number of bytes read</returns>
+        public static int Read(AudioStream from, List<TrackEvent> allevents, List<TempoEvent> tempoevents, List<TimeSignatureEvent> tsigevents) {
+            allevents.Add(new TrackEvent());
+            int index = allevents.Count - 1;
+            int eventSize = from.Read(allevents[index], vlv: "Timing");
+
+            // meta and sysex events
+            switch (allevents[index].Prefix) {
+                case (byte)TrackEvent.EventType.SysEx1:
+                case (byte)TrackEvent.EventType.SysEx2:
+                    Console.WriteLine("System exclusive events are not supported.");
+                    return -1;
+                case (byte)TrackEvent.EventType.Meta:
+                    eventSize += MetaEvent.Read(from, allevents, tempoevents, tsigevents);
+                    return eventSize;
+            }
+
+            int midiread = MidiEvent.Read(from, allevents);
+            if (midiread == -1) {
+                return -1;
+            }
+
+            eventSize += midiread;
+            return eventSize;
+        }
         
     }
 
@@ -388,11 +235,46 @@ namespace Midis {
         
         // event types for midi events
         public enum MidiEventType : byte {
-            NoteOn = 0x9,
             NoteOff = 0x8,
-            Instrument = 0xc,
+            NoteOn = 0x9,
+            PolyphonicAT = 0xa,
             Controller = 0xb,
+            Instrument = 0xc,
+            ChannelAT = 0xd,
             PitchBend = 0xe
+        }
+
+        /// <summary>
+        /// Reads a midievent from a stream
+        /// </summary>
+        /// <param name="from">stream where to read from</param>
+        /// <param name="to">list where to read</param>
+        /// <returns>number of bytes read or -1 if unknown event type</returns>
+        public static int Read(AudioStream from, List<TrackEvent> to) {
+            int index = to.Count - 1;
+            int eventSize = 0;
+            // midi events are detected with high bits (first four)
+            switch (to[index].Prefix >> 4) {
+                case (byte)MidiEvent.MidiEventType.Controller:
+                    eventSize += ControllerEvent.Read(from, to);
+                    break;
+                case (byte)MidiEvent.MidiEventType.NoteOn:
+                case (byte)MidiEvent.MidiEventType.NoteOff:
+                    eventSize += NoteEvent.Read(from, to);
+                    break;
+                case (byte)MidiEvent.MidiEventType.Instrument:
+                case (byte)MidiEvent.MidiEventType.ChannelAT:
+                    from.Skip(1);
+                    return 1;
+                case (byte)MidiEvent.MidiEventType.PolyphonicAT:
+                case (byte)MidiEvent.MidiEventType.PitchBend:
+                    from.Skip(2);
+                    return 2;
+                default:
+                    Console.WriteLine("Unknown midi event type 0x{0}", BitConverter.ToString(new byte[] { to[index].Prefix }));
+                    return -1;
+            }
+            return eventSize;
         }
 
     }
@@ -407,14 +289,27 @@ namespace Midis {
         public byte Pitch;
         public byte Velocity;
 
-    }
+        /// <summary>
+        /// Reads a noteevent from the filestream
+        /// </summary>
+        /// <param name="from">stream where to read from</param>
+        /// <param name="to">where to read event</param>
+        /// <returns>number of bytes read</returns>
+        public new static int Read(AudioStream from, List<TrackEvent> to) {
+            int index = to.Count - 1;
 
-    /// <summary>
-    /// intrument events, skipping with size
-    /// </summary>
-    public class InstrumentEvent : MidiEvent {
+            NoteEvent n = new NoteEvent();
+            AudioStream.Copy(to[index], n);
 
-        public static int Size = 1;
+            int eventSize = from.Read(n, skipFields: new string[] { "Timing", "Prefix" });
+
+#if NOTEDEBUG
+            AudioStream.DebugByteObject(n);
+#endif
+
+            to[index] = n;
+            return eventSize;
+        }
 
     }
 
@@ -435,14 +330,24 @@ namespace Midis {
         public byte Controller;
         public byte Value;
 
-    }
+        /// <summary>
+        /// Reads a controllerevent from the filestream
+        /// </summary>
+        /// <param name="from">stream where to read from</param>
+        /// <param name="to">where to read event</param>
+        /// <returns>number of bytes read</returns>
+        public new static int Read(AudioStream from, List<TrackEvent> to) {
+            int index = to.Count - 1;
 
-    /// <summary>
-    /// useless, we only care about size so we can skip this
-    /// </summary>
-    public class PitchBendEvent : MidiEvent {
+            ControllerEvent c = new ControllerEvent();
+            AudioStream.Copy(to[index], c);
 
-        public static int Size = 2;
+            int eventSize = from.Read(c, skipFields: new string[] { "Timing", "Prefix" });
+
+            to[index] = c;
+
+            return eventSize;
+        }
 
     }
 
@@ -459,12 +364,76 @@ namespace Midis {
         
         public byte Type;
         public byte[] Size; //VLV
-        
+
+        /// <summary>
+        /// Reads a metaevent from the filestream
+        /// </summary>
+        /// <param name="from">stream where to read from</param>
+        /// <param name="allevents">list of all trackevents</param>
+        /// <param name="tempoevents">list of tempoevents</param>
+        /// <param name="tsigevents">list of timesignatureevents</param>
+        /// <returns>number of bytes read / skipped</returns>
+        public new static int Read(AudioStream from, List<TrackEvent> allevents, List<TempoEvent> tempoevents, List<TimeSignatureEvent> tsigevents) {
+            // index is always last one in list
+            int index = allevents.Count - 1;
+
+            // new meta event with the prefix and timing
+            MetaEvent m = new MetaEvent();
+            AudioStream.Copy(allevents[index], m);
+
+            // read new data into the meta event class, Size is a VLV and skip over Timing and Prefix
+            int eventSize = from.Read(m, vlv: "Size", skipFields: new string[] { "Timing", "Prefix" });
+
+            // read tempo or time signature events
+            switch (m.Type) {
+                case (byte)MetaEvent.MetaEventType.Tempo:
+                    eventSize += TempoEvent.Read(from, allevents[index], tempoevents);
+                    allevents.RemoveAt(index);
+                    return eventSize;
+                case (byte)MetaEvent.MetaEventType.TimeSignature:
+                    eventSize += TimeSignatureEvent.Read(from, allevents[index], tsigevents);
+                    allevents.RemoveAt(index);
+                    return eventSize;
+            }
+
+            // skip the meta event data
+            int skip = ByteConverter.ToInt(m.Size);
+            from.Skip(skip);
+
+            // remove the event since we do not need it
+            allevents.RemoveAt(index);
+
+#if (METADEBUG)
+            AudioStream.DebugByteObject(m);
+            Console.WriteLine("Bytes skipped: {0}", skip);
+#endif
+
+            return eventSize + skip;
+        }
+
     }
 
     public class TempoEvent : MetaEvent {
 
         public byte[] MSPerQN = new byte[3];
+
+        /// <summary>
+        /// Reads a tempoevent into a list of trackevents
+        /// </summary>
+        /// <param name="from">audiostream to read from</param>
+        /// <param name="to">list of trackevents where to read</param>
+        /// <returns>number of bytes read from the stream</returns>
+        public static int Read(AudioStream from, TrackEvent original, List<TempoEvent> to) { 
+            int eventSize = 0;
+            TempoEvent t = new TempoEvent();
+            AudioStream.Copy(original, t);
+            eventSize += from.Read(t, skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
+#if TEMPODEBUG
+            AudioStream.DebugByteObject(t);
+#endif
+            to.Add(t);
+            return eventSize;
+        }
 
     }
 
@@ -474,6 +443,24 @@ namespace Midis {
         public byte Denominator;
         public byte TicksPerClick;
         public byte QN32;
+
+        /// <summary>
+        /// Reads a timesignatureevent into a list of trackevents
+        /// </summary>
+        /// <param name="from">audiostream to read from</param>
+        /// <param name="to">list of trackevents where to read</param>
+        /// <returns>number of bytes read from the stream</returns>
+        public static int Read(AudioStream from, TrackEvent original, List<TimeSignatureEvent> to) {
+            int eventSize = 0;
+            TimeSignatureEvent t = new TimeSignatureEvent();
+            AudioStream.Copy(original, t);
+            eventSize += from.Read(t, skipFields: new string[] { "Timing", "Prefix", "Size", "Type" });
+#if TIMESIGDEBUG
+            AudioStream.DebugByteObject(t);
+#endif
+            to.Add(t);
+            return eventSize;
+        }
 
     }
 
