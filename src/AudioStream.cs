@@ -171,7 +171,7 @@ namespace AudioFileStream {
         /// pretty print a class that only has variables made of byte arrays (byte[]) and ints
         /// </summary>
         /// <param name="o">object to print</param>
-        public static void DebugByteObject(object o) {
+        public static void DebugByteObject(object o, bool littleendian = false) {
             Console.WriteLine("\n{0}", o.GetType().Name);
             foreach (FieldInfo field in o.GetType().GetFields()) {
                 if ((field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) && field.GetValue(o) != null) {
@@ -182,7 +182,7 @@ namespace AudioFileStream {
                     } else {
                         value = new byte[] { (byte)field.GetValue(o) };
                     }
-                    Console.Write("{0, -20} ", ByteConverter.ToInt(value));
+                    Console.Write("{0, -20} ", ByteConverter.ToInt(value, littleendian));
                     Console.Write("{0, -20} ", BitConverter.ToString(value));
                     Console.Write("{0}", ByteConverter.ToASCIIString(value));
                 } else if (field.FieldType == typeof(int) && field.GetValue(o) != null) {

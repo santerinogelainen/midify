@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using AudioFileStream;
+using Waves;
 
 namespace Midis {
 
@@ -171,7 +172,7 @@ namespace Midis {
         public byte[] Size = new byte[4];
         public byte[] Format = new byte[2];
         public byte[] Tracks = new byte[2];
-        public byte[] Timing = new byte[2];
+        public byte[] Division = new byte[2];
     }
 
     /// <summary>
@@ -181,6 +182,12 @@ namespace Midis {
         public byte[] Prefix = new byte[4];
         public byte[] Size = new byte[4];
         public List<TrackEvent> Events = new List<TrackEvent>();
+
+        public Wave ToWave(string clippath) {
+            Wave clip = new Wave(WaveFile.Read, clippath);
+            return clip;
+        }
+
     }
 
     public class TrackEvent {
@@ -416,6 +423,17 @@ namespace Midis {
     public class TempoEvent : MetaEvent {
 
         public byte[] MSPerQN = new byte[3];
+
+        public float MilPerQN {
+            get {
+                return (float)ByteConverter.ToInt(this.MSPerQN) / 1000;
+            }
+        }
+
+        public float MilPerTick(byte[] division) {
+            float div = (float)ByteConverter.ToInt(division);
+            return MilPerQN / div;
+        }
 
         /// <summary>
         /// Reads a tempoevent into a list of trackevents

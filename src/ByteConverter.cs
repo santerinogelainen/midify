@@ -11,7 +11,7 @@ namespace ByteConvert {
         public static int ToInt(byte[] arr, bool staylittleendian = false) {
 
             if (arr.Length == 3) {
-                if (BitConverter.IsLittleEndian) {
+                if (BitConverter.IsLittleEndian && !staylittleendian) {
                     arr = new byte[4] {
                         0x00,
                         arr[0],
