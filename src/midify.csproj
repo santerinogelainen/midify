@@ -7,8 +7,8 @@
     <ProjectGuid>{04440606-745B-47D5-A4B8-AE2C3AEC5B9C}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ConsoleApplication3</RootNamespace>
-    <AssemblyName>ConsoleApplication3</AssemblyName>
+    <RootNamespace>Midify</RootNamespace>
+    <AssemblyName>midify</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -33,6 +33,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>Midify.Run</StartupObject>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -44,10 +47,24 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ByteConverter.cs" />
-    <Compile Include="AudioStream.cs" />
-    <Compile Include="Wave.cs" />
-    <Compile Include="Midi.cs" />
+    <Compile Include="Helpers\ByteConverter.cs" />
+    <Compile Include="Helpers\AudioStream.cs" />
+    <Compile Include="Midi\Tick.cs" />
+    <Compile Include="Midi\TimeSignatureEvent.cs" />
+    <Compile Include="Midi\TempoEvent.cs" />
+    <Compile Include="Midi\MetaEvent.cs" />
+    <Compile Include="Midi\ControllerEvent.cs" />
+    <Compile Include="Midi\NoteEvent.cs" />
+    <Compile Include="Midi\MidiEvent.cs" />
+    <Compile Include="Midi\TrackEvent.cs" />
+    <Compile Include="Midi\TrackChunk.cs" />
+    <Compile Include="Midi\HeaderChunk.cs" />
+    <Compile Include="Wave\Sample.cs" />
+    <Compile Include="Wave\DataChunk.cs" />
+    <Compile Include="Wave\FormatChunk.cs" />
+    <Compile Include="Wave\HeaderChunk.cs" />
+    <Compile Include="Wave\Wave.cs" />
+    <Compile Include="Midi\Midi.cs" />
     <Compile Include="Midify.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

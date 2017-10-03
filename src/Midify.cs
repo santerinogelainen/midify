@@ -1,9 +1,9 @@
 ﻿using System;
-using Midis;
-using Waves;
+using Midify.MidiFile;
+using Midify.WaveFile;
 
-namespace ConsoleApplication3 {
-    class midify {
+namespace Midify {
+    class Run {
 
         public static readonly string[] options = {"help", "tc", "make"};
 
@@ -39,7 +39,7 @@ namespace ConsoleApplication3 {
 
         static void Make(string filepath) {
             Midi m = new Midi(filepath);
-            Wave w = m.Tracks[0].ToWave("wave.wav");
+            Wave w = m.TrackToWave(m.Tracks[1], "wave.wav");
             w.Save("test.wav");
         }
 

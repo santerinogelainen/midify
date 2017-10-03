@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ByteConvert {
+namespace Midify.Helpers {
     static class ByteConverter {
 
         /// <summary>
