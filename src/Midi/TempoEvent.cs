@@ -39,10 +39,10 @@ namespace Midify.MidiFile.Events {
         public static int Read(AudioStream from, TrackEvent original, List<TempoEvent> to) {
             int eventSize = 0;
             TempoEvent t = new TempoEvent();
-            AudioStream.Copy(original, t);
+            t.CopyFrom(original);
             eventSize += from.Read(t, skipFields: new string[] { "Timing", "Prefix", "Size", "Type", "AbsoluteTiming" });
 #if TEMPODEBUG
-            AudioStream.DebugByteObject(t);
+            this.Debug();
 #endif
             to.Add(t);
             return eventSize;

@@ -1,8 +1,6 @@
 ﻿#define DEBUG
-//#define SAMPLEDEBUG
 
 using System;
-using System.Collections.Generic;
 using Midify.Helpers;
 using Midify.WaveFile.Chunks;
 using System.IO;
@@ -43,7 +41,7 @@ namespace Midify.WaveFile {
             }
 
             // set filestream
-            this.Stream = new AudioStream(filepath);
+            this.Stream = new AudioStream(filepath, true);
 
             // check file length
             if (this.Stream.Length <= Wave.MinSize) {
@@ -80,8 +78,8 @@ namespace Midify.WaveFile {
             this.Header.FileSize = Wave.MinSize + this.Data.Size;
 
 #if DEBUG
-            AudioStream.DebugByteObject(this.Header, true);
-            AudioStream.DebugByteObject(this.Data, true);
+            this.Header.Debug();
+            this.Data.Debug();
 #endif
 
             return true;
@@ -126,9 +124,9 @@ namespace Midify.WaveFile {
             this.Format.BitsPerChannel = Wave.TargetFormat.BitsPerChannel;
 
 #if DEBUG
-            AudioStream.DebugByteObject(this.Header, true);
-            AudioStream.DebugByteObject(this.Format, true);
-            AudioStream.DebugByteObject(this.Data, true);
+            this.Header.Debug();
+            this.Format.Debug();
+            this.Data.Debug();
 #endif
 
             return true;

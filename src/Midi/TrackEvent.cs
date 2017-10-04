@@ -4,7 +4,7 @@ using Midify.Helpers;
 using Midify.MidiFile.Chunks;
 
 namespace Midify.MidiFile.Events {
-    public class TrackEvent {
+    public class TrackEvent : BigEndianObjectStruct {
 
         // event types, midi events have multiple types that only use 4bits
         public enum EventType : byte {

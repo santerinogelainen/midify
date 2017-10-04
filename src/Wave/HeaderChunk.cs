@@ -3,7 +3,7 @@ using System.Linq;
 using Midify.Helpers;
 
 namespace Midify.WaveFile.Chunks {
-    public class HeaderChunk {
+    public class HeaderChunk : LittleEndianObjectStruct {
         public byte[] Prefix = new byte[4] { (byte)'R', (byte)'I', (byte)'F', (byte)'F' };
         public int FileSize = 44; // changes, (44 + DataChunk.Size)
         public byte[] Format = new byte[4] { (byte)'W', (byte)'A', (byte)'V', (byte)'E' };
@@ -16,7 +16,7 @@ namespace Midify.WaveFile.Chunks {
             // read header from the filestream
             from.Read(this);
 #if DEBUG
-            AudioStream.DebugByteObject(this, true);
+            this.Debug();
 #endif
 
             // check that the file is a riff file

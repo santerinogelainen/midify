@@ -32,7 +32,7 @@ namespace Midify.MidiFile.Events {
 
             // new meta event with the prefix and timing
             MetaEvent m = new MetaEvent();
-            AudioStream.Copy(track.Events[index], m);
+            m.CopyFrom(track.Events[index]);
 
             // read new data into the meta event class, Size is a VLV and skip over Timing and Prefix
             int eventSize = from.Read(m, vlv: "Size", skipFields: new string[] { "Timing", "Prefix", "AbsoluteTiming" });
@@ -57,7 +57,7 @@ namespace Midify.MidiFile.Events {
             track.Events.RemoveAt(index);
 
 #if (METADEBUG)
-            AudioStream.DebugByteObject(m);
+            this.Debug();
             Console.WriteLine("Bytes skipped: {0}", skip);
 #endif
 

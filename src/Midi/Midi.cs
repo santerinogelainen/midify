@@ -48,7 +48,7 @@ namespace Midify.MidiFile {
             this.Stream = new AudioStream(file);
 
             // read the header into the Header variable
-            if (!this.ReadHeader()) {
+            if (!this.Header.Read(this.Stream)) {
                 Console.WriteLine("Error reading the header.");
                 return false;
             }
@@ -59,31 +59,6 @@ namespace Midify.MidiFile {
                 return false;
             }
             return true;
-        }
-
-        /// <summary>
-        /// read the header of the file to this.header
-        /// </summary>
-        private bool ReadHeader() {
-            // read the first 14 bytes in the filestream to header
-            this.Stream.Read(this.Header);
-#if (DEBUG)
-            // show debug info
-            AudioStream.DebugByteObject(this.Header);
-#endif
-            // probably a midi file
-            if (ByteConverter.ToASCIIString(this.Header.Prefix) == "MThd" &&
-                ByteConverter.ToInt(this.Header.Size) == 6) {
-
-                // too many songs in one file
-                if (ByteConverter.ToInt(this.Header.Format) == 2) {
-                    Console.WriteLine("Midi files with multiple songs are not supported.");
-                    return false;
-                }
-                return true;
-            }
-            Console.WriteLine("The file given is not a midi file.");
-            return false;
         }
 
         /// <summary>
@@ -99,12 +74,17 @@ namespace Midify.MidiFile {
 
                 // add new track
                 this.Tracks.Add(new TrackChunk());
+                TrackChunk track = this.Tracks[this.Tracks.Count - 1];
 
                 // try reading the track info into the new track
-                if (!this.ReadTrack(this.Tracks[i])) {
+                if (!track.Read(this.Stream, this.TempoChanges, this.TimeSignatureChanges)) {
                     Console.WriteLine("Error reading track at index {0}.", i);
                     return false;
                 }
+
+#if DEBUG
+
+#endif
 
             }
 
@@ -117,52 +97,6 @@ namespace Midify.MidiFile {
             foreach (TrackChunk track in this.Tracks) {
                 track.Events = track.Events.OrderBy(x => x.AbsoluteTiming).ToList();
             }
-            return true;
-        }
-
-        /// <summary>
-        /// reads a single track into the list of tracks
-        /// </summary>
-        /// <param name="track">track</param>
-        /// <returns>true if successful</returns>
-        private bool ReadTrack(TrackChunk track) {
-            this.Stream.Read(track, skipFields: new string[1] { "TickSize" });
-
-            if (ByteConverter.ToASCIIString(track.Prefix) != "MTrk") {
-                Console.WriteLine("Track does not start with MTrk prefix.");
-                return false;
-            }
-
-            bool success = this.ReadAllEvents(track);
-
-#if (DEBUG)
-            // show track header info
-            AudioStream.DebugByteObject(track);
-#endif
-
-            return success;
-        }
-
-        /// <summary>
-        /// Reads all events in a track into a list
-        /// </summary>
-        /// <param name="track">track</param>
-        /// <returns>true if successful</returns>
-        private bool ReadAllEvents(TrackChunk track) {
-            int trackByteSize = ByteConverter.ToInt(track.Size);
-            int i = 0;
-            while (true) {
-                int jumpResult = TrackEvent.Read(this.Stream, track, this.TempoChanges, this.TimeSignatureChanges);
-                if (jumpResult == -1) {
-                    Console.WriteLine("Error reading event at index {0} of {1} bytes in the track (byte {2} in whole file).", i, trackByteSize, this.Stream.Stream.Position);
-                    return false;
-                }
-                i += jumpResult;
-                if (i >= trackByteSize) {
-                    break;
-                }
-            }
-
             return true;
         }
 

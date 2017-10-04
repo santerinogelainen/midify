@@ -30,7 +30,7 @@ namespace Midify.MidiFile.Events {
             int index = to.Count - 1;
 
             ControllerEvent c = new ControllerEvent();
-            AudioStream.Copy(to[index], c);
+            c.CopyFrom(to[index]);
 
             int eventSize = from.Read(c, skipFields: new string[] { "Timing", "Prefix", "AbsoluteTiming" });
 

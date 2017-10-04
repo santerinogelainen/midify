@@ -5,7 +5,7 @@ using Midify.Helpers;
 
 namespace Midify.WaveFile.Chunks {
 
-    public class DataChunk {
+    public class DataChunk : LittleEndianObjectStruct {
         public byte[] Prefix = new byte[4] { (byte)'d', (byte)'a', (byte)'t', (byte)'a' };
         public int Size; // changes
         public List<Sample> Samples = new List<Sample>(); // changes
@@ -16,9 +16,9 @@ namespace Midify.WaveFile.Chunks {
         /// <returns></returns>
         public bool Read(AudioStream from, FormatChunk format) {
             // read datachunk
-            from.Read(this, littleendian: true);
+            from.Read(this);
 #if DEBUG
-            AudioStream.DebugByteObject(this, true);
+            this.Debug();
 #endif
             // check datachunk prefix
             if (!this.Prefix.SequenceEqual(Wave.TargetData.Prefix)) {
@@ -26,8 +26,8 @@ namespace Midify.WaveFile.Chunks {
                 return false;
             }
 
-            int bytespersample = ByteConverter.ToInt(format.BlockAlign, true);
-            int bitsperchannel = (int)ByteConverter.ToInt(format.BitsPerChannel, true);
+            int bytespersample = ByteConverter.ToInt(format.BlockAlign, from.IsLittleEndian);
+            int bitsperchannel = (int)ByteConverter.ToInt(format.BitsPerChannel, from.IsLittleEndian);
 
             Console.WriteLine("Reading samples...");
             int nextprogress = 1;
@@ -52,7 +52,7 @@ namespace Midify.WaveFile.Chunks {
                     nextprogress = progressint + 1;
                 }
 #if SAMPLEDEBUG
-                AudioStream.DebugByteObject(this.Samples[sampleindex], true);
+                this.Samples[sampleindex].Debug();
 #endif
             }
             Console.WriteLine();

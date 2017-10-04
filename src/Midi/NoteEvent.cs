@@ -24,12 +24,12 @@ namespace Midify.MidiFile.Events {
             int index = to.Count - 1;
 
             NoteEvent n = new NoteEvent();
-            AudioStream.Copy(to[index], n);
+            n.CopyFrom(to[index]);
 
             int eventSize = from.Read(n, skipFields: new string[] { "Timing", "Prefix", "AbsoluteTiming" });
 
 #if NOTEDEBUG
-            AudioStream.DebugByteObject(n);
+            this.Debug();
 #endif
 
             to[index] = n;

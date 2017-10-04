@@ -19,10 +19,10 @@ namespace Midify.MidiFile.Events {
         public static int Read(AudioStream from, TrackEvent original, List<TimeSignatureEvent> to) {
             int eventSize = 0;
             TimeSignatureEvent t = new TimeSignatureEvent();
-            AudioStream.Copy(original, t);
+            t.CopyFrom(original);
             eventSize += from.Read(t, skipFields: new string[] { "Timing", "Prefix", "Size", "Type", "AbsoluteTiming" });
 #if TIMESIGDEBUG
-            AudioStream.DebugByteObject(t);
+            this.Debug();
 #endif
             to.Add(t);
             return eventSize;

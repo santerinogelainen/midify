@@ -3,7 +3,7 @@ using Midify.Helpers;
 using System.Linq;
 
 namespace Midify.WaveFile.Chunks {
-    public class FormatChunk {
+    public class FormatChunk : LittleEndianObjectStruct {
         public byte[] Prefix = new byte[4] { (byte)'f', (byte)'m', (byte)'t', (byte)' ' };
         public byte[] Size = new byte[4] { 0x10, 0x00, 0x00, 0x00 }; // 16 bytes
         public byte[] Format = new byte[2] { 0x01, 0x00 }; // 1 for PCM
@@ -21,7 +21,7 @@ namespace Midify.WaveFile.Chunks {
             // read format chunk
             from.Read(this);
 #if DEBUG
-            AudioStream.DebugByteObject(this, true);
+            this.Debug();
 #endif
 
             // check format chunk prefix
@@ -44,7 +44,7 @@ namespace Midify.WaveFile.Chunks {
             }
 
             // check number of channels
-            if (ByteConverter.ToInt(this.NumChannels, true) != 1 && ByteConverter.ToInt(this.NumChannels, true) != 2) {
+            if (ByteConverter.ToInt(this.NumChannels, from.IsLittleEndian) != 1 && ByteConverter.ToInt(this.NumChannels, from.IsLittleEndian) != 2) {
                 Console.WriteLine("Too many channels in wave file (max 2 / stereo).");
                 return false;
             }

@@ -11,8 +11,11 @@ namespace Midify.Helpers {
 
         public FileStream Stream;
         public Int64 Length;
-
-        public AudioStream(string filepath) {
+        public bool IsLittleEndian;
+        
+        /// <param name="filepath">path to an audio file</param>
+        /// <param name="islittleendian">is the file little or bigendian</param>
+        public AudioStream(string filepath, bool islittleendian = false) {
 
             if (!File.Exists(filepath)) {
                 Console.WriteLine("Error. File not found ({0}).", filepath);
@@ -21,6 +24,7 @@ namespace Midify.Helpers {
 
             this.Stream = new FileStream(filepath, FileMode.Open);
             this.Length = this.Stream.Length;
+            this.IsLittleEndian = islittleendian;
         }
 
 
@@ -32,7 +36,7 @@ namespace Midify.Helpers {
         /// <param name="skipFields">array of variable names to skip</param>
         /// <param name="littleendian">keep little endianness of the number</param>
         /// <returns>integer of how many bytes did we read in the filestream</returns>
-        public int Read(object to, string vlv = "", string[] skipFields = null, bool littleendian = false) {
+        public int Read(object to, string vlv = "", string[] skipFields = null) {
             skipFields = skipFields ?? new string[0];
             int travelDistance = 0;
             // loop through each field in a class
@@ -53,7 +57,7 @@ namespace Midify.Helpers {
 
                     // ELSE if the field is an int
                     else if (field.FieldType == typeof(int)) {
-                        travelDistance += this.ReadInt(field, to, littleendian);
+                        travelDistance += this.ReadInt(field, to);
                     }
                 }
             }
@@ -149,7 +153,7 @@ namespace Midify.Helpers {
         /// <param name="field">what field</param>
         /// <param name="to">where to</param>
         /// <returns>number of bytes moved in the filestream (always 4)</returns>
-        private int ReadInt(FieldInfo field, object to, bool littleendian = false) {
+        private int ReadInt(FieldInfo field, object to) {
             int numberOfBytes = 4;
 
             // read bytes
@@ -157,7 +161,7 @@ namespace Midify.Helpers {
             this.Stream.Read(temp, 0, numberOfBytes);
 
             // convert bytes into an integer
-            int result = ByteConverter.ToInt(temp, littleendian);
+            int result = ByteConverter.ToInt(temp, this.IsLittleEndian);
 
             // set value of the field
             field.SetValue(to, result);
@@ -165,33 +169,6 @@ namespace Midify.Helpers {
             // return travel distance in filestream
             return numberOfBytes;
         }
-
-        /// <summary>
-        /// pretty print a class that only has variables made of byte arrays (byte[]) and ints
-        /// </summary>
-        /// <param name="o">object to print</param>
-        public static void DebugByteObject(object o, bool littleendian = false) {
-            Console.WriteLine("\n{0}", o.GetType().Name);
-            foreach (FieldInfo field in o.GetType().GetFields()) {
-                if ((field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte)) && field.GetValue(o) != null) {
-                    Console.Write("\n{0, -15}", field.Name);
-                    byte[] value;
-                    if (field.FieldType == typeof(byte[])) {
-                        value = (byte[])field.GetValue(o);
-                    } else {
-                        value = new byte[] { (byte)field.GetValue(o) };
-                    }
-                    Console.Write("{0, -20} ", ByteConverter.ToInt(value, littleendian));
-                    Console.Write("{0, -20} ", BitConverter.ToString(value));
-                    Console.Write("{0}", ByteConverter.ToASCIIString(value));
-                } else if (field.FieldType == typeof(int) && field.GetValue(o) != null) {
-                    Console.Write("\n{0, -15}", field.Name);
-                    Console.Write("{0, -20} ", (int)field.GetValue(o));
-                }
-            }
-            Console.WriteLine("\n");
-        }
-
 
         /// <summary>
         /// Writes bytes, byte arrays and int64s into a file as bytes
@@ -232,32 +209,6 @@ namespace Midify.Helpers {
                 }
             }
             return traveldistance;
-        }
-
-        /// <summary>
-        /// Copies non-static byte arrays, bytes and integers from one object to another
-        /// </summary>
-        /// <param name="from">object where to copy from</param>
-        /// <param name="to">object where to copy</param>
-        /// <param name="skipFields">skip any fields?</param>
-        /// <returns>number of fields copied</returns>
-        public static int Copy(object from, object to, string[] skipFields = null) {
-            skipFields = skipFields ?? new string[0];
-            int copied = 0;
-            foreach (FieldInfo field in from.GetType().GetFields()) {
-                if (Array.IndexOf(skipFields, field.Name) == -1 && 
-                    (field.FieldType == typeof(byte[]) || field.FieldType == typeof(byte) || field.FieldType == typeof(int)) &&
-                    !field.IsStatic &&
-                    field.GetValue(from) != null) {
-
-                    FieldInfo tofield = to.GetType().GetField(field.Name);
-                    if (tofield != null) {
-                        tofield.SetValue(to, field.GetValue(from));
-                        copied++;
-                    }
-                }
-            }
-            return copied;
         }
 
         /// <summary>

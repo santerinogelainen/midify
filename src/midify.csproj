@@ -49,6 +49,7 @@
   <ItemGroup>
     <Compile Include="Helpers\ByteConverter.cs" />
     <Compile Include="Helpers\AudioStream.cs" />
+    <Compile Include="Helpers\ObjectStruct.cs" />
     <Compile Include="Midi\Tick.cs" />
     <Compile Include="Midi\TimeSignatureEvent.cs" />
     <Compile Include="Midi\TempoEvent.cs" />
