@@ -1,5 +1,6 @@
 ﻿using System;
 using Midify.Helpers;
+using System.Collections.Generic;
 
 namespace Midify.WaveFile {
     public class Sample {
@@ -7,7 +8,7 @@ namespace Midify.WaveFile {
         public byte[] Left;
         public byte[] Right;
 
-        public Sample(int bitsperchannel) {
+        public Sample(int bitsperchannel = 16) {
             int channelbytesize = bitsperchannel / 8;
             Size = channelbytesize;
             Left = new byte[channelbytesize];
@@ -50,5 +51,44 @@ namespace Midify.WaveFile {
             Left = BitConverter.GetBytes(l16);
             Right = BitConverter.GetBytes(r16);
         }
+
+        /// <summary>
+        /// Appends or combines samples in a list
+        /// </summary>
+        /// <param name="to">where to copy</param>
+        /// <param name="from">where to copy from</param>
+        /// <param name="offset">where to start looking in to array</param>
+        public static void AppendOrCombine(List<Sample> to, List<Sample> from, int offset) {
+            for (int i = 0; i < from.Count; i++) {
+                int curpos = i + offset;
+                if (to.Count > curpos) { // already data there
+                    Sample a = to[curpos-1];
+                    Sample b = from[i];
+                    to[curpos - 1] = Sample.Combine(a, b);
+                } else { // no data
+                    to.Add(from[i]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Combines to samples together
+        /// </summary>
+        /// <param name="a">sample a</param>
+        /// <param name="b">sample b</param>
+        /// <returns>new sample with combined values</returns>
+        public static Sample Combine(Sample a, Sample b) {
+            Sample result = new Sample();
+            int al = ByteConverter.ToInt(a.Left, true);
+            int ar = ByteConverter.ToInt(a.Right, true);
+            int bl = ByteConverter.ToInt(b.Left, true);
+            int br = ByteConverter.ToInt(b.Right, true);
+            Int16 left = (Int16)((al / 2) + (bl / 2));
+            Int16 right = (Int16)((ar / 2) + (br / 2));
+            result.Left = BitConverter.GetBytes(left);
+            result.Right = BitConverter.GetBytes(right);
+            return result;
+        }
+
     }
 }

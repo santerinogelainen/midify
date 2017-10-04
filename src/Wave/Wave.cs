@@ -9,6 +9,13 @@ namespace Midify.WaveFile {
 
     public class Wave {
 
+
+
+        // to do!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // listchunk
+
+
+
         // static variables
         public static int MinSize = 44; // min bytesize
         public static readonly HeaderChunk TargetHeader = new HeaderChunk();
@@ -79,6 +86,7 @@ namespace Midify.WaveFile {
 
 #if DEBUG
             this.Header.Debug();
+            this.Format.Debug();
             this.Data.Debug();
 #endif
 
@@ -122,12 +130,6 @@ namespace Midify.WaveFile {
             this.Format.ByteRate = Wave.TargetFormat.ByteRate;
             this.Format.BlockAlign = Wave.TargetFormat.BlockAlign;
             this.Format.BitsPerChannel = Wave.TargetFormat.BitsPerChannel;
-
-#if DEBUG
-            this.Header.Debug();
-            this.Format.Debug();
-            this.Data.Debug();
-#endif
 
             return true;
         }

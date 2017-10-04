@@ -37,10 +37,12 @@ namespace Midify.MidiFile.Events {
                 case (byte)MidiEvent.MidiEventType.Instrument:
                 case (byte)MidiEvent.MidiEventType.ChannelAT:
                     from.Skip(1);
+                    to.RemoveAt(index);
                     return 1;
                 case (byte)MidiEvent.MidiEventType.PolyphonicAT:
                 case (byte)MidiEvent.MidiEventType.PitchBend:
                     from.Skip(2);
+                    to.RemoveAt(index);
                     return 2;
                 default:
                     Console.WriteLine("Unknown midi event type 0x{0}", BitConverter.ToString(new byte[] { to[index].Prefix }));

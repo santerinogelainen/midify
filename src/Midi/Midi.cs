@@ -101,18 +101,26 @@ namespace Midify.MidiFile {
         }
 
         public Wave TrackToWave(TrackChunk track, string clippath) {
+            // clip
+            // to do!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            // is loaded
             Wave clip = new Wave(FileMode.Open, clippath);
 
-            // final wave
+            // final product
             Wave final = new Wave(FileMode.Create);
 
             // copy of tempo events
-            List<TempoEvent> tempoevents = this.TempoChanges;
-            List<TrackEvent> trackevents = track.Events;
+            List<TempoEvent> tempoevents = this.TempoChanges.ToList();
+            List<TrackEvent> trackevents = track.Events.ToList();
+
             // final list of samples
             List<Sample> samples = new List<Sample>();
-            // current tempo of the song
-            TempoEvent curTempo = new TempoEvent(); // default 120bpm, 500000MSPerQN
+
+            // current offset in wave file
+            int sampleoffset = 0;
+
+            // tick info
+            TickInfo curTick = new TickInfo(this.Header.Division, final.Format.SampleRate);
 
             NoteEvent[,] openEvents = new NoteEvent[16, 128];
             // loop each tick
@@ -120,7 +128,7 @@ namespace Midify.MidiFile {
                 // check tempo changes, tempo changes are in order
                 while (true) {
                     if (tempoevents.Count != 0 && tick == tempoevents[0].AbsoluteTiming) {
-                        curTempo = tempoevents[0];
+                        curTick.Update(tempoevents[0]);
                         tempoevents.RemoveAt(0);
                     } else {
                         break;
@@ -128,23 +136,18 @@ namespace Midify.MidiFile {
                 }
                 // check note events
                 while (true) {
-                    if (trackevents.Count != 0 && tick == trackevents[0].AbsoluteTiming && ((trackevents[0].Prefix >> 4) == 0x9 || (trackevents[0].Prefix >> 4) == 0x8)) {
+                    int prefix = trackevents[0].Prefix >> 4;
+                    if (trackevents.Count != 0 && tick == trackevents[0].AbsoluteTiming && (prefix == 0x9 || prefix == 0x8)) {
                         int channel = (int)(trackevents[0].Prefix & 0x0f);
                         int pitch = (int)((NoteEvent)trackevents[0]).Pitch;
                         if (openEvents[channel, pitch] != null) {
                             openEvents[channel, pitch] = null;
                         } else {
                             openEvents[channel, pitch] = (NoteEvent)trackevents[0];
-                            // to do:
-                            // place clip data into (tick * secpertick) * samplerate(44100)th position in final.data.samples list
-                            // at the same time check if there already is data there...
-                            // if there is, change the existing sample byte data with the following:
-                            // (oldsample.left / 2) + (newsample.left / 2)
-                            // (oldsample.right / 2) + (newsample.right / 2)
-                            // if there is not place 0byte samples
+                            Sample.AppendOrCombine(samples, clip.Data.Samples, sampleoffset);
                         }
                         trackevents.RemoveAt(0);
-                    } else if (trackevents.Count != 0 && tick == trackevents[0].AbsoluteTiming && (trackevents[0].Prefix >> 4) == 0xb) {
+                    } else if (trackevents.Count != 0 && tick == trackevents[0].AbsoluteTiming && prefix == 0xb) {
                         byte type = ((ControllerEvent)trackevents[0]).Controller;
                         // clear all notes
                         if (type == (byte)ControllerEvent.ControllerEventType.NotesOff) {
@@ -154,13 +157,24 @@ namespace Midify.MidiFile {
                                 }
                             }
                         }
+                        trackevents.RemoveAt(0);
                     } else {
                         break;
                     }
                 }
+                Sample.AppendOrCombine(samples, curTick.DefaultSample.ToList(), sampleoffset);
+                sampleoffset += curTick.SampleSize;
             }
 
-            return clip;
+            final.Data.Samples = samples;
+            final.Data.Size = samples.Count * ByteConverter.ToInt(final.Format.BlockAlign, true);
+            final.Header.FileSize = final.Data.Size + Wave.MinSize;
+
+            final.Header.Debug();
+            final.Format.Debug();
+            final.Data.Debug();
+
+            return final;
         }
 
     }

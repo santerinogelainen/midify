@@ -2,6 +2,8 @@
 //#define TEMPODEBUG
 using System.Collections.Generic;
 using Midify.Helpers;
+using System;
+using Midify.WaveFile;
 
 namespace Midify.MidiFile.Events {
     public class TempoEvent : MetaEvent {
@@ -28,6 +30,13 @@ namespace Midify.MidiFile.Events {
         public float MilPerTick(byte[] division) {
             float div = (float)ByteConverter.ToInt(division);
             return MilPerQN / div;
+        }
+
+        public int SamplesPerTick(byte[] division, byte[] samplerate) {
+            float tick = this.SecPerTick(division);
+            int rate = ByteConverter.ToInt(samplerate, true);
+            float pertick = tick * rate;
+            return (int)Math.Round(pertick);
         }
 
         /// <summary>
