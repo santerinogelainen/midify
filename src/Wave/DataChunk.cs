@@ -6,8 +6,9 @@ using Midify.Helpers;
 namespace Midify.WaveFile.Chunks {
 
     public class DataChunk : LittleEndianObjectStruct {
+
         public byte[] Prefix = new byte[4] { (byte)'d', (byte)'a', (byte)'t', (byte)'a' };
-        public int Size; // changes
+        public int Size = 0;
         public List<Sample> Samples = new List<Sample>(); // changes
 
         /// <summary>

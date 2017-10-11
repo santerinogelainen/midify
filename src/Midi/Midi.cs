@@ -168,7 +168,7 @@ namespace Midify.MidiFile {
 
             final.Data.Samples = samples;
             final.Data.Size = samples.Count * ByteConverter.ToInt(final.Format.BlockAlign, true);
-            final.Header.FileSize = final.Data.Size + Wave.MinSize;
+            final.Header.Size = final.Data.Size + Wave.MinSize;
 
             final.Header.Debug();
             final.Format.Debug();

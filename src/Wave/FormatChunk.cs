@@ -5,7 +5,7 @@ using System.Linq;
 namespace Midify.WaveFile.Chunks {
     public class FormatChunk : LittleEndianObjectStruct {
         public byte[] Prefix = new byte[4] { (byte)'f', (byte)'m', (byte)'t', (byte)' ' };
-        public byte[] Size = new byte[4] { 0x10, 0x00, 0x00, 0x00 }; // 16 bytes
+        public int Size = 16;
         public byte[] Format = new byte[2] { 0x01, 0x00 }; // 1 for PCM
         public byte[] NumChannels = new byte[2] { 0x02, 0x00 }; // 2 channels for stereo
         public byte[] SampleRate = new byte[4] { 0x44, 0xac, 0x00, 0x00 }; // 44100, samples per second
@@ -32,7 +32,7 @@ namespace Midify.WaveFile.Chunks {
 
             // maybe edit these to try and convert into a pcm wave file
             // check format chunk size
-            if (!this.Size.SequenceEqual(Wave.TargetFormat.Size)) {
+            if (this.Size != Wave.TargetFormat.Size) {
                 Console.WriteLine("Format chunk byte size is not 16. Wave file might not be PCM.");
                 return false;
             }

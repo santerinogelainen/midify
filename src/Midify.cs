@@ -39,10 +39,10 @@ namespace Midify {
 
         static void Make(string filepath) {
             Midi m = new Midi(filepath);
-            /*Wave clip = new Wave(System.IO.FileMode.Open, "wave.wav");
-            clip.Save("clip.wav");*/
-            Wave w = m.TrackToWave(m.Tracks[0], "WOO.wav");
-            w.Save("test.wav");
+            Wave clip = new Wave(System.IO.FileMode.Open, "WOO.wav");
+            clip.Save("wootest.wav");
+            /*Wave w = m.TrackToWave(m.Tracks[0], "WOO.wav");
+            w.Save("test.wav");*/
         }
 
         /// <summary>

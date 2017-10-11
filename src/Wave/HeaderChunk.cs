@@ -5,7 +5,7 @@ using Midify.Helpers;
 namespace Midify.WaveFile.Chunks {
     public class HeaderChunk : LittleEndianObjectStruct {
         public byte[] Prefix = new byte[4] { (byte)'R', (byte)'I', (byte)'F', (byte)'F' };
-        public int FileSize = 44; // changes, (44 + DataChunk.Size)
+        public int Size = 44;
         public byte[] Format = new byte[4] { (byte)'W', (byte)'A', (byte)'V', (byte)'E' };
 
         /// <summary>

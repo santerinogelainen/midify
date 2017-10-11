@@ -34,7 +34,6 @@ namespace Midify.WaveFile {
                     this.IsLoaded = this.Read(filepath);
                     break;
                 case FileMode.Create:
-                    this.IsLoaded = this.Write();
                     break;
             }
         }
@@ -68,6 +67,9 @@ namespace Midify.WaveFile {
                 return false;
             }
 
+            // skip all list chunks
+            ListChunk.SkipAll(this.Stream);
+
             // read all samples
             if (!this.Data.Read(this.Stream, this.Format)) {
                 Console.WriteLine("Error reading wave file samples.");
@@ -82,7 +84,7 @@ namespace Midify.WaveFile {
 
             // trim clip
             this.Data.Trim();
-            this.Header.FileSize = Wave.MinSize + this.Data.Size;
+            this.Header.Size = Wave.MinSize + this.Data.Size;
 
 #if DEBUG
             this.Header.Debug();
@@ -126,7 +128,7 @@ namespace Midify.WaveFile {
 
             // change chunks datas
             this.Data.Size = datachunksize;
-            this.Header.FileSize = Wave.MinSize + datachunksize;
+            this.Header.Size = Wave.MinSize + datachunksize;
             this.Format.ByteRate = Wave.TargetFormat.ByteRate;
             this.Format.BlockAlign = Wave.TargetFormat.BlockAlign;
             this.Format.BitsPerChannel = Wave.TargetFormat.BitsPerChannel;
@@ -168,11 +170,32 @@ namespace Midify.WaveFile {
             newfile.Close();
             return true;
         }
-    
 
-        private bool Write() {
-            return true;
+
+        public void ChangePitch(int howmuch) {
+            double modifier = (double)howmuch / 64;
+            foreach (Sample s in this.Data.Samples) {
+                int oldLeft = ByteConverter.ToInt(s.Left, true);
+                int oldRight = ByteConverter.ToInt(s.Right, true);
+                double newLeft = oldLeft * modifier;
+                double newRight = oldRight * modifier;
+                if (newLeft > Int16.MaxValue) {
+                    newLeft = Int16.MaxValue;
+                }
+                if (newLeft < -Int16.MaxValue) {
+                    newLeft = -Int16.MaxValue;
+                }
+                if (newRight > Int16.MaxValue) {
+                    newRight = Int16.MaxValue;
+                }
+                if (newRight < -Int16.MaxValue) {
+                    newRight = -Int16.MaxValue;
+                }
+                s.Left = BitConverter.GetBytes((Int16)newLeft);
+                s.Right = BitConverter.GetBytes((Int16)newRight);
+            }
         }
+
 
     }
 }

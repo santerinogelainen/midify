@@ -60,6 +60,7 @@
     <Compile Include="Midi\TrackEvent.cs" />
     <Compile Include="Midi\TrackChunk.cs" />
     <Compile Include="Midi\HeaderChunk.cs" />
+    <Compile Include="Wave\ListChunk.cs" />
     <Compile Include="Wave\Sample.cs" />
     <Compile Include="Wave\DataChunk.cs" />
     <Compile Include="Wave\FormatChunk.cs" />
