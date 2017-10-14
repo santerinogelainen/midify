@@ -3,4 +3,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <StartArguments>make non.mid</StartArguments>
   </PropertyGroup>
+  <PropertyGroup>
+    <ReferencePath>C:\Program Files (x86)\AForge.NET\Framework\Release\</ReferencePath>
+  </PropertyGroup>
 </Project>

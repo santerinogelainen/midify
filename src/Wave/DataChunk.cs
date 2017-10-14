@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using Midify.Helpers;
+using System.Numerics;
+using MathNet.Numerics.IntegralTransforms;
 
 namespace Midify.WaveFile.Chunks {
 
@@ -93,5 +95,65 @@ namespace Midify.WaveFile.Chunks {
                 }
             }
         }
+
+
+        
+        public void ChangePitch(int amount) {
+            int fraction = 1;
+            int size = 44100 / fraction;
+            int to = (Samples.Count / size) + 1;
+            int shift = amount / fraction;
+            for (int i = 0; i < to; i++) {
+                float[] leftData = new float[size % 2 == 0 ? size + 2 : size + 1];
+                float[] rightData = new float[size % 2 == 0 ? size + 2 : size + 1];
+                for (int j = 0; j < size; j++) {
+                    int index = j + (i * size);
+                    if (Samples.ElementAtOrDefault(index) != null) {
+                        leftData[j] = Samples[index].LeftFloat;
+                        rightData[j] = Samples[index].RightFloat;
+                    } else {
+                        leftData[j] = 0;
+                        rightData[j] = 0;
+                    }
+                }
+                Fourier.ForwardReal(leftData, size);
+                Fourier.ForwardReal(rightData, size);
+                leftData = RollAndPad(leftData, shift);
+                rightData = RollAndPad(rightData, shift);
+                Fourier.InverseReal(leftData, size);
+                Fourier.InverseReal(rightData, size);
+                for (int j = 0; j < size; j++) {
+                    int index = j + (i * size);
+                    if (Samples.ElementAtOrDefault(index) != null) {
+                        float leftSampleData = leftData[j];
+                        if (leftSampleData >= Int16.MaxValue) {
+                            leftSampleData = Int16.MaxValue;
+                        }
+                        if (leftSampleData <= Int16.MinValue) {
+                            leftSampleData = Int16.MinValue;
+                        }
+                        float rightSampleData = rightData[j];
+                        if (rightSampleData >= Int16.MaxValue) {
+                            rightSampleData = Int16.MaxValue;
+                        }
+                        if (rightSampleData <= Int16.MinValue) {
+                            rightSampleData = Int16.MinValue;
+                        }
+                        Samples[index].Left = BitConverter.GetBytes((Int16)leftSampleData);
+                        Samples[index].Right = BitConverter.GetBytes((Int16)rightSampleData);
+                    }
+                }
+            }
+        }
+
+        private float[] RollAndPad(float[] values, int shift) {
+            float[] final = new float[values.Length];
+            Array.Copy(values, 0, final, shift, values.Length - shift);
+            for (int i = 0; i < shift; i++) {
+                final[i] = 0;
+            }
+            return final;
+        }
+
     }
 }

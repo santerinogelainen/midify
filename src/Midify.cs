@@ -40,7 +40,8 @@ namespace Midify {
         static void Make(string filepath) {
             Midi m = new Midi(filepath);
             Wave clip = new Wave(System.IO.FileMode.Open, "WOO.wav");
-            clip.Save("wootest.wav");
+            clip.Data.ChangePitch(100);
+            clip.Save("woointerpolate.wav");
             /*Wave w = m.TrackToWave(m.Tracks[0], "WOO.wav");
             w.Save("test.wav");*/
         }

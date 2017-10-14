@@ -1,12 +1,37 @@
 ﻿using System;
 using Midify.Helpers;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace Midify.WaveFile {
     public class Sample {
         int Size;
         public byte[] Left;
         public byte[] Right;
+
+        public int LeftInt {
+            get {
+                return ByteConverter.ToInt(Left, true);
+            }
+        }
+
+        public int RightInt {
+            get {
+                return ByteConverter.ToInt(Right, true);
+            }
+        }
+
+        public float LeftFloat {
+            get {
+                return LeftInt;
+            }
+        }
+
+        public float RightFloat {
+            get {
+                return RightInt;
+            }
+        }
 
         public Sample(int bitsperchannel = 16) {
             int channelbytesize = bitsperchannel / 8;
@@ -30,8 +55,8 @@ namespace Midify.WaveFile {
         /// </summary>
         /// <param name="origbitsize">Original bitsize (8, 24 or 32)</param>
         private void ChannelsTo16(int origbitsize) {
-            int l = ByteConverter.ToInt(this.Left, true);
-            int r = ByteConverter.ToInt(this.Right, true);
+            int l = LeftInt;
+            int r = RightInt;
             switch (origbitsize) {
                 case 8:
                     l *= byte.MaxValue;
@@ -79,10 +104,10 @@ namespace Midify.WaveFile {
         /// <returns>new sample with combined values</returns>
         public static Sample Combine(Sample a, Sample b) {
             Sample result = new Sample();
-            int al = ByteConverter.ToInt(a.Left, true);
-            int ar = ByteConverter.ToInt(a.Right, true);
-            int bl = ByteConverter.ToInt(b.Left, true);
-            int br = ByteConverter.ToInt(b.Right, true);
+            int al = a.LeftInt;
+            int ar = a.RightInt;
+            int bl = b.LeftInt;
+            int br = b.RightInt;
             Int16 left = (Int16)((al / 2) + (bl / 2));
             Int16 right = (Int16)((ar / 2) + (br / 2));
             result.Left = BitConverter.GetBytes(left);

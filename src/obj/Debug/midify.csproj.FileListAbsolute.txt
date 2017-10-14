@@ -12,3 +12,5 @@ C:\Users\sante\source\repos\c-midi\src\bin\Debug\midify.exe
 C:\Users\sante\source\repos\c-midi\src\bin\Debug\midify.pdb
 C:\Users\sante\source\repos\c-midi\src\obj\Debug\midify.exe
 C:\Users\sante\source\repos\c-midi\src\obj\Debug\midify.pdb
+C:\Users\sante\source\repos\c-midi\src\bin\Debug\MathNet.Numerics.dll
+C:\Users\sante\source\repos\c-midi\src\bin\Debug\MathNet.Numerics.xml
